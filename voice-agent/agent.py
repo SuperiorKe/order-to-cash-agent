@@ -68,10 +68,14 @@ def prewarm(proc: agents.JobProcess):
 async def entrypoint(ctx: agents.JobContext):
     session = AgentSession(
         # Ears: Whisper on Groq. Batch transcription, not the realtime
-        # websocket, which Groq does not serve.
+        # websocket, which Groq does not serve. detect_language=True instead
+        # of pinning language="en": Boss code-switches between English and
+        # Swahili, sometimes mid-sentence, and forcing English decoding would
+        # mangle the Swahili half of every such turn. Whisper is multilingual
+        # already; this just stops overriding it.
         stt=openai.STT(
             model=os.getenv("GROQ_STT_MODEL", "whisper-large-v3-turbo"),
-            language="en",
+            detect_language=True,
             use_realtime=False,
             api_key=GROQ_API_KEY,
             base_url=GROQ_BASE_URL,
