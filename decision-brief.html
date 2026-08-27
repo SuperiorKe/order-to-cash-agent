@@ -1,0 +1,472 @@
+<style>
+  :root {
+    --ground: #f1f2f0;
+    --surface: #fbfbfa;
+    --surface-2: #e9ebe8;
+    --ink: #17201f;
+    --muted: #586360;
+    --faint: #8a938f;
+    --hair: rgba(23, 32, 31, 0.12);
+    --hair-strong: rgba(23, 32, 31, 0.22);
+    --accent: #0e6e7a;
+    --accent-soft: rgba(14, 110, 122, 0.10);
+    --go: #2e7d4f;
+    --go-soft: rgba(46, 125, 79, 0.12);
+    --warn: #a4741f;
+    --warn-soft: rgba(164, 116, 31, 0.13);
+    --kill: #bd3b2b;
+    --kill-soft: rgba(189, 59, 43, 0.11);
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #101413;
+      --surface: #171d1c;
+      --surface-2: #1f2625;
+      --ink: #e8eae7;
+      --muted: #9aa39f;
+      --faint: #6f7a76;
+      --hair: rgba(232, 234, 231, 0.12);
+      --hair-strong: rgba(232, 234, 231, 0.20);
+      --accent: #3aa9b6;
+      --accent-soft: rgba(58, 169, 182, 0.14);
+      --go: #57b37e;
+      --go-soft: rgba(87, 179, 126, 0.15);
+      --warn: #d0a24e;
+      --warn-soft: rgba(208, 162, 78, 0.15);
+      --kill: #e06a58;
+      --kill-soft: rgba(224, 106, 88, 0.15);
+    }
+  }
+  :root[data-theme="light"] {
+    --ground: #f1f2f0; --surface: #fbfbfa; --surface-2: #e9ebe8;
+    --ink: #17201f; --muted: #586360; --faint: #8a938f;
+    --hair: rgba(23,32,31,0.12); --hair-strong: rgba(23,32,31,0.22);
+    --accent: #0e6e7a; --accent-soft: rgba(14,110,122,0.10);
+    --go: #2e7d4f; --go-soft: rgba(46,125,79,0.12);
+    --warn: #a4741f; --warn-soft: rgba(164,116,31,0.13);
+    --kill: #bd3b2b; --kill-soft: rgba(189,59,43,0.11);
+  }
+  :root[data-theme="dark"] {
+    --ground: #101413; --surface: #171d1c; --surface-2: #1f2625;
+    --ink: #e8eae7; --muted: #9aa39f; --faint: #6f7a76;
+    --hair: rgba(232,234,231,0.12); --hair-strong: rgba(232,234,231,0.20);
+    --accent: #3aa9b6; --accent-soft: rgba(58,169,182,0.14);
+    --go: #57b37e; --go-soft: rgba(87,179,126,0.15);
+    --warn: #d0a24e; --warn-soft: rgba(208,162,78,0.15);
+    --kill: #e06a58; --kill-soft: rgba(224,106,88,0.15);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .sheet {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: clamp(1.1rem, 3vw, 2.4rem);
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  /* Masthead */
+  .mast {
+    border: 1px solid var(--hair-strong);
+    background: var(--surface);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .mast-top {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.7rem 1.15rem;
+    border-bottom: 1px solid var(--hair);
+    background: var(--surface-2);
+  }
+  .mast-top .eyebrow { color: var(--muted); }
+  .stamp {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--go);
+    border: 1px solid var(--go);
+    border-radius: 3px;
+    padding: 0.18rem 0.5rem;
+    font-weight: 600;
+  }
+  .mast-body { padding: clamp(1.1rem, 3vw, 1.8rem) 1.15rem; }
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 3rem);
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+    text-wrap: balance;
+    margin: 0.35rem 0 0.6rem;
+  }
+  h1 .tag {
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    vertical-align: middle;
+    margin-left: 0.4rem;
+  }
+  .lede {
+    font-size: clamp(1rem, 2.1vw, 1.18rem);
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .lede strong { color: var(--ink); font-weight: 650; }
+
+  /* Sections */
+  section { margin-top: clamp(1.4rem, 3.5vw, 2.2rem); }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding-bottom: 0.55rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--hair);
+  }
+  .sec-num {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+  .sec-head h2 {
+    font-size: 1.02rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.9rem;
+  }
+  @media (max-width: 620px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 4px;
+    padding: 1rem 1.1rem;
+  }
+  .card h3 {
+    font-size: 0.95rem;
+    margin: 0 0 0.35rem;
+    font-weight: 700;
+  }
+  .card p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+
+  .verdict {
+    border-left: 3px solid var(--go);
+    background: var(--go-soft);
+  }
+  .verdict h3 { color: var(--go); }
+  .verdict p { color: var(--ink); }
+
+  .gate-list { display: grid; gap: 0.7rem; }
+  .gate {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.7rem;
+    align-items: start;
+  }
+  .gate .k {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.06em;
+    color: var(--go);
+    border: 1px solid var(--go);
+    border-radius: 3px;
+    padding: 0.16rem 0.34rem;
+    text-transform: uppercase;
+    white-space: nowrap;
+    margin-top: 0.1rem;
+  }
+  .gate .v { font-size: 0.9rem; color: var(--muted); }
+  .gate .v b { color: var(--ink); font-weight: 650; }
+
+  /* Loop / flow */
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+  .step {
+    flex: 1 1 130px;
+    min-width: 120px;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-top: 2px solid var(--accent);
+    border-radius: 4px;
+    padding: 0.6rem 0.7rem;
+    position: relative;
+  }
+  .step .n {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+  }
+  .step .t { font-weight: 650; font-size: 0.86rem; margin-top: 0.15rem; }
+  .step .c { font-family: var(--mono); font-size: 0.63rem; color: var(--faint); margin-top: 0.25rem; letter-spacing: 0.03em; }
+  .at-line {
+    margin-top: 0.85rem;
+    font-size: 0.88rem;
+    color: var(--muted);
+    padding: 0.6rem 0.8rem;
+    border: 1px dashed var(--hair-strong);
+    border-radius: 4px;
+    background: var(--accent-soft);
+  }
+  .at-line b { color: var(--accent); }
+
+  /* Timeline */
+  .timeline { display: grid; gap: 0; }
+  .tl {
+    display: grid;
+    grid-template-columns: 88px 1fr;
+    gap: 0.9rem;
+    padding: 0.62rem 0;
+    border-bottom: 1px solid var(--hair);
+  }
+  .tl:last-child { border-bottom: 0; }
+  .tl .time {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--accent);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding-top: 0.05rem;
+  }
+  .tl .what { font-size: 0.92rem; }
+  .tl .what b { font-weight: 650; }
+  .tl .what span { color: var(--muted); }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--hair); border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; min-width: 480px; font-size: 0.86rem; }
+  thead th {
+    font-family: var(--mono);
+    font-size: 0.64rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--faint);
+    text-align: left;
+    padding: 0.6rem 0.7rem;
+    border-bottom: 1px solid var(--hair-strong);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  thead th.num, tbody td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+  tbody td { padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--hair); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody td.name { font-weight: 600; }
+  tbody tr.win { background: var(--go-soft); }
+  tbody tr.win td.name { color: var(--go); }
+  tbody tr.dead td.name { color: var(--kill); }
+  .rowtag {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    padding: 0.1rem 0.34rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+  }
+  .rowtag.go { color: var(--go); border: 1px solid var(--go); }
+  .rowtag.kill { color: var(--kill); border: 1px solid var(--kill); }
+
+  /* Kill block */
+  .kill-block { border-left: 3px solid var(--kill); background: var(--kill-soft); }
+  .kill-block h3 { color: var(--kill); }
+  .kill-list { margin: 0.5rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.45rem; }
+  .kill-list li { display: grid; grid-template-columns: auto 1fr; gap: 0.6rem; font-size: 0.9rem; color: var(--muted); }
+  .kill-list li::before { content: "✕"; color: var(--kill); font-weight: 700; }
+  .kill-list li b { color: var(--ink); font-weight: 650; }
+
+  /* Validate block */
+  .validate { border-left: 3px solid var(--warn); background: var(--warn-soft); }
+  .validate h3 { color: var(--warn); }
+  .q-list { margin: 0.6rem 0 0; padding-left: 0; list-style: none; counter-reset: q; display: grid; gap: 0.5rem; }
+  .q-list li {
+    display: grid; grid-template-columns: auto 1fr; gap: 0.6rem;
+    font-size: 0.9rem; color: var(--ink);
+  }
+  .q-list li::before {
+    counter-increment: q; content: "Q" counter(q);
+    font-family: var(--mono); font-size: 0.66rem; color: var(--warn);
+    border: 1px solid var(--warn); border-radius: 3px; padding: 0.16rem 0.3rem;
+    height: fit-content; margin-top: 0.06rem; white-space: nowrap;
+  }
+  .assumption { font-size: 0.92rem; color: var(--ink); margin: 0; }
+  .assumption b { color: var(--warn); }
+
+  /* Footer */
+  footer {
+    margin-top: 2rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--hair-strong);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.5rem;
+    justify-content: space-between;
+  }
+  footer .note { font-size: 0.76rem; color: var(--faint); max-width: 58ch; }
+  footer .note b { color: var(--muted); }
+  .facts { display: flex; flex-wrap: wrap; gap: 1.1rem; }
+  .fact { }
+  .fact .n { font-family: var(--mono); font-weight: 700; font-size: 1.05rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .fact .l { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+</style>
+
+<div class="sheet">
+
+  <div class="mast">
+    <div class="mast-top">
+      <span class="eyebrow">Africa's Talking &middot; Manufacturing Hackathon &middot; Nairobi &middot; 27 Aug 2026</span>
+      <span class="stamp">Decision: Build</span>
+    </div>
+    <div class="mast-body">
+      <span class="eyebrow">Team decision brief</span>
+      <h1>Build the Order-to-Cash Agent<span class="tag">problem #8</span></h1>
+      <p class="lede">The winning shape for this event is not a machinery problem. It is an <strong>event-triggered agent that talks to the people who live outside our software</strong> (customers, suppliers, debtors) over SMS, USSD, Voice and M-Pesa. Order-to-cash is the sharpest, safest, most reusable version of that.</p>
+    </div>
+  </div>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>The decision</h2></div>
+    <div class="grid-2">
+      <div class="card verdict">
+        <h3>BUILD &mdash; Order-to-Cash agent</h3>
+        <p>An agent for SME and Jua Kali manufacturers that takes an order, confirms and schedules it, collects payment by M-Pesa, and chases late payment with an escalating SMS then a Voice call. Ship it Marketplace-ready. <b>Procurement / restock (#2) is the same engine as a second module.</b></p>
+      </div>
+      <div class="card">
+        <h3>Why it wins this specific hackathon</h3>
+        <div class="gate-list">
+          <div class="gate"><span class="k">Gate 1</span><span class="v"><b>Demoable with no fake IoT.</b> A real phone rings in the room. Nothing to simulate.</span></div>
+          <div class="gate"><span class="k">Gate 2</span><span class="v"><b>Marketplace-horizontal.</b> Every manufacturer has receivables. One env var (M-Pesa shortcode) and a stranger clicks Deploy.</span></div>
+          <div class="gate"><span class="k">Gate 3</span><span class="v"><b>Named in the brief.</b> Order Management and Manufacturing Finance are 2 of the 12 official categories.</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>What we build &mdash; the loop</h2></div>
+    <div class="flow">
+      <div class="step"><div class="n">01</div><div class="t">Order in</div><div class="c">USSD / SMS</div></div>
+      <div class="step"><div class="n">02</div><div class="t">Confirm + schedule</div><div class="c">SMS to buyer</div></div>
+      <div class="step"><div class="n">03</div><div class="t">Watch due date</div><div class="c">timer</div></div>
+      <div class="step"><div class="n">04</div><div class="t">Remind</div><div class="c">SMS</div></div>
+      <div class="step"><div class="n">05</div><div class="t">Escalate</div><div class="c">Voice call</div></div>
+      <div class="step"><div class="n">06</div><div class="t">Collect + reconcile</div><div class="c">M-Pesa Daraja</div></div>
+    </div>
+    <p class="at-line">Africa's Talking is <b>load-bearing, not decorative.</b> The customer who owes money is on a basic phone, not in our dashboard. SMS reminder, then Voice escalation, then M-Pesa collection is the natural spine of the workflow. That is the whole point of the loop.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>The 7-minute demo</h2></div>
+    <div class="timeline">
+      <div class="tl"><div class="time">0:00</div><div class="what"><b>The pain.</b> <span>A workshop owner's phone: three WhatsApp order threads, a paper debtors list, one customer three weeks late.</span></div></div>
+      <div class="tl"><div class="time">1:00</div><div class="what"><b>Today.</b> <span>He chases by hand, misses orders during production, and over 60% of his invoices run past 30 days.</span></div></div>
+      <div class="tl"><div class="time">2:00</div><div class="what"><b>Order placed live.</b> <span>Someone in the room orders by USSD/SMS. The agent confirms, logs, schedules, and notifies the owner.</span></div></div>
+      <div class="tl"><div class="time">4:30</div><div class="what"><b>Collection.</b> <span>Due date hits. Agent sends an SMS. Still unpaid, it places an automated Voice call, then fires an M-Pesa STK push.</span></div></div>
+      <div class="tl"><div class="time">5:30</div><div class="what"><b>Outcome.</b> <span>Payment lands, the agent reconciles it, the invoice flips to paid. Nothing chased by hand.</span></div></div>
+      <div class="tl"><div class="time">6:15</div><div class="what"><b>The product.</b> <span>Any manufacturer clicks Deploy, sets their shortcode, and runs this. That is the Marketplace pitch.</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>How the candidates scored</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Candidate problem</th>
+            <th class="num">Pain</th>
+            <th class="num">AT fit</th>
+            <th class="num">Mkt</th>
+            <th class="num">1-day</th>
+            <th class="num">Demo</th>
+            <th class="num">Total /55</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="win"><td class="name">Order-to-cash (#8)<span class="rowtag go">Build</span></td><td class="num">4</td><td class="num">5</td><td class="num">5</td><td class="num">4</td><td class="num">5</td><td class="num">48</td></tr>
+          <tr><td class="name">Procurement / restock (#2)</td><td class="num">4</td><td class="num">5</td><td class="num">4</td><td class="num">4</td><td class="num">4</td><td class="num">47</td></tr>
+          <tr><td class="name">Jua Kali USSD storefront (#10)</td><td class="num">4</td><td class="num">5</td><td class="num">4</td><td class="num">4</td><td class="num">4</td><td class="num">44</td></tr>
+          <tr><td class="name">Inventory alerts (#5)</td><td class="num">4</td><td class="num">4</td><td class="num">4</td><td class="num">4</td><td class="num">3</td><td class="num">41</td></tr>
+          <tr class="dead"><td class="name">Machine downtime (#3)<span class="rowtag kill">Kill</span></td><td class="num">4</td><td class="num">3</td><td class="num">2</td><td class="num">1</td><td class="num">2</td><td class="num">30</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2>What we are not building</h2></div>
+    <div class="card kill-block">
+      <h3>Kill the "production disruption" agent</h3>
+      <ul class="kill-list">
+        <li><b>No real trigger.</b> Without IoT, a human types "machine down" and the agent is just a notification router.</li>
+        <li><b>Fails the Marketplace test.</b> It needs each factory's machines, schedules and customers. No stranger can click Deploy.</li>
+        <li><b>Cannot demo honestly.</b> The event has to be faked, and judges see through fake IoT.</li>
+      </ul>
+      <p style="margin-top:0.7rem; font-size:0.88rem; color:var(--muted);">The only valuable, buildable piece inside it is the communication loop. We keep that piece and give it a real trigger: an order and an invoice due date. That is #8.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">06</span><h2>Before we commit &mdash; ask the floor in hour one</h2></div>
+    <div class="grid-2">
+      <div class="card validate">
+        <h3>The one load-bearing assumption</h3>
+        <p class="assumption">That owners will <b>trust an agent to contact their own customers automatically</b>, and that those customers respond to automated SMS, USSD and Voice instead of ignoring it. If a "no", pivot to the supplier side (#2), where the trust concern is lower.</p>
+      </div>
+      <div class="card">
+        <h3>Three questions that can change the plan</h3>
+        <ul class="q-list">
+          <li>Walk me through the last time a customer paid late. What did you do, and how many hours did it cost?</li>
+          <li>Would you let software SMS or call your customers on your behalf, or is that too risky?</li>
+          <li>In today's sandbox, what is most reliable to demo live: inbound SMS, USSD, or Voice callbacks?</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="facts">
+      <div class="fact"><div class="n">7.1%</div><div class="l">Mfg share of GDP, 2025</div></div>
+      <div class="fact"><div class="n">60%+</div><div class="l">SMEs paid &gt;30 days late</div></div>
+      <div class="fact"><div class="n">1&times;AT</div><div class="l">API required to win</div></div>
+      <div class="fact"><div class="n">$100</div><div class="l">Prize + Marketplace entry</div></div>
+    </div>
+    <p class="note"><b>Evidence note.</b> GDP and late-payment figures are from KNBS/KAM and Strathmore Business School. Widely quoted "missed sales %" figures come from vendor blogs and are treated as unverified. Personas are research-derived composites, not real interviews.</p>
+  </footer>
+
+</div>

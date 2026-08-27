@@ -1,0 +1,653 @@
+<title>Order to Cash Listing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
+<style>
+  /* Palette read from the subject: galvanised steel and the blue of a welding arc.
+     Neutrals carry a slight green bias so they sit under the arc blue as a set. */
+  :root {
+    --ground:    #F1F4F3;
+    --surface:   #FFFFFF;
+    --sunk:      #E7ECEA;
+    --ink:       #141D1A;
+    --ink-soft:  #556360;
+    --ink-faint: #7C8B87;
+    --line:      #D2DAD7;
+    --line-soft: #E2E8E6;
+    --arc:       #1B5EA8;
+    --arc-soft:  #E8F0F8;
+    --signal:    #A85A17;
+    --focus:     #1B5EA8;
+  }
+  :root:not([data-theme="light"]) {
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground:    #0E1513;
+      --surface:   #151E1B;
+      --sunk:      #1A2522;
+      --ink:       #E4EAE8;
+      --ink-soft:  #97A5A1;
+      --ink-faint: #74827E;
+      --line:      #283530;
+      --line-soft: #1F2C28;
+      --arc:       #74AEE8;
+      --arc-soft:  #16283A;
+      --signal:    #DC9349;
+      --focus:     #74AEE8;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground:    #0E1513;
+    --surface:   #151E1B;
+    --sunk:      #1A2522;
+    --ink:       #E4EAE8;
+    --ink-soft:  #97A5A1;
+    --ink-faint: #74827E;
+    --line:      #283530;
+    --line-soft: #1F2C28;
+    --arc:       #74AEE8;
+    --arc-soft:  #16283A;
+    --signal:    #DC9349;
+    --focus:     #74AEE8;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 24px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 56px;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 64px 0 0;
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0;
+  }
+  .masthead h1 {
+    font-family: Archivo, "Arial Narrow", Helvetica, sans-serif;
+    font-weight: 700;
+    font-size: clamp(2.1rem, 6vw, 3.1rem);
+    line-height: 1.04;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+    margin: 0;
+  }
+  .standfirst {
+    font-size: 1.075rem;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .masthead-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+  .masthead-meta b {
+    color: var(--ink-soft);
+    font-weight: 500;
+  }
+
+  /* ---------- sections ---------- */
+
+  .band {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .band-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 10px;
+  }
+  .band-num {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--arc);
+    font-weight: 500;
+    flex: none;
+  }
+  .band-head h2 {
+    font-family: Archivo, "Arial Narrow", Helvetica, sans-serif;
+    font-size: 1.32rem;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    margin: 0;
+  }
+  .band p { margin: 0; max-width: 66ch; }
+  .band h3 {
+    font-family: Archivo, "Arial Narrow", Helvetica, sans-serif;
+    font-size: 1.02rem;
+    font-weight: 600;
+    letter-spacing: 0.002em;
+    margin: 12px 0 0;
+  }
+  .note {
+    color: var(--ink-soft);
+    font-size: 0.925rem;
+    max-width: 64ch;
+  }
+
+  /* ---------- the paste blocks ---------- */
+
+  .copyblock {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+  }
+  .copyblock-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--sunk);
+  }
+  .copyblock-label {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .copybtn {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--arc);
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 0;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  .copybtn:hover { background: var(--arc-soft); }
+  .copybtn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .copybtn[data-done="1"] { color: var(--ink-soft); }
+  .copyblock-body { padding: 16px 18px; }
+  .copyblock-body > :first-child { margin-top: 0; }
+  .copyblock-body > :last-child { margin-bottom: 0; }
+  .copyblock-body p { margin: 0 0 14px; }
+  .copyblock-body p:last-child { margin-bottom: 0; }
+  .lede {
+    font-size: 1.12rem;
+    line-height: 1.5;
+  }
+  .charcount {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+
+  /* ---------- name ---------- */
+
+  .namecard {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px 20px;
+  }
+  .namecard .thename {
+    font-family: Archivo, "Arial Narrow", Helvetica, sans-serif;
+    font-size: 2.05rem;
+    font-weight: 700;
+    letter-spacing: -0.022em;
+    line-height: 1.1;
+  }
+  .slug {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 13px;
+    color: var(--ink-soft);
+    background: var(--sunk);
+    border: 1px solid var(--line-soft);
+    padding: 3px 8px;
+  }
+
+  /* ---------- the loop ---------- */
+
+  .loop {
+    list-style: none;
+    counter-reset: step;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+  .loop li {
+    counter-increment: step;
+    background: var(--surface);
+    padding: 14px 18px 14px 52px;
+    position: relative;
+  }
+  .loop li::before {
+    content: counter(step, decimal-leading-zero);
+    position: absolute;
+    left: 18px;
+    top: 15px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--arc);
+  }
+  .loop li.escalation::before { color: var(--signal); }
+  .loop b {
+    font-weight: 600;
+    display: block;
+  }
+  .loop span {
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+  }
+
+  /* ---------- tables ---------- */
+
+  .scroller {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.925rem;
+    min-width: 520px;
+  }
+  th, td {
+    text-align: left;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+  }
+  thead th {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 500;
+    background: var(--sunk);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  .plan-name {
+    font-family: Archivo, "Arial Narrow", Helvetica, sans-serif;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .price {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--ink);
+  }
+  .var {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+  .req {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .req.yes { color: var(--arc); }
+  .req.no  { color: var(--ink-faint); }
+
+  /* ---------- misc ---------- */
+
+  .cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+  .cols > div {
+    background: var(--surface);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .cols dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .cols dd {
+    margin: 0;
+    font-size: 0.94rem;
+    color: var(--ink);
+  }
+  ul.plain {
+    margin: 0;
+    padding-left: 20px;
+    max-width: 64ch;
+  }
+  ul.plain li { margin-bottom: 7px; }
+  ul.plain li:last-child { margin-bottom: 0; }
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.86em;
+    background: var(--sunk);
+    padding: 1px 5px;
+  }
+  em { color: var(--ink-soft); }
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    line-height: 1.8;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <p class="eyebrow">Africa's Talking Marketplace &middot; submission copy</p>
+    <h1>Order to Cash</h1>
+    <p class="standfirst">Everything on this page is ready to paste into the Marketplace submission form.
+      It covers the checklist in section 7 of the build plan: name, one line, long description, pricing,
+      category, declared environment variables and the database need.</p>
+    <div class="masthead-meta">
+      <span><b>Problem</b> #8, order-to-cash</span>
+      <span><b>Repo</b> order-to-cash-agent</span>
+      <span><b>Drafted</b> 27 Aug 2026</span>
+      <span><b>Owner</b> D, surface and ship</span>
+    </div>
+  </header>
+
+  <section class="band">
+    <div class="band-head"><span class="band-num">01</span><h2>Name</h2></div>
+    <div class="namecard">
+      <span class="thename">Order to Cash</span>
+      <span class="slug">order-to-cash</span>
+    </div>
+    <p class="note">The name says the job in the words the category already uses, so it reads correctly
+      sitting next to Order Management and Manufacturing Finance in the listing grid. Two alternates if the
+      team wants something shorter: <b>Paid</b>, which is memorable but weak in search, and
+      <b>Invoice Chaser</b>, which is plain but hides the order intake half of the product.</p>
+  </section>
+
+  <section class="band">
+    <div class="band-head"><span class="band-num">02</span><h2>One-line description</h2></div>
+    <div class="copyblock">
+      <div class="copyblock-bar">
+        <span class="copyblock-label">Primary &middot; <span class="charcount">89 characters</span></span>
+        <button class="copybtn" type="button" data-copy="one-primary">Copy</button>
+      </div>
+      <div class="copyblock-body">
+        <p class="lede" id="one-primary">Takes orders by USSD and SMS, then chases every invoice to paid by SMS, Voice and M-Pesa.</p>
+      </div>
+    </div>
+    <div class="copyblock">
+      <div class="copyblock-bar">
+        <span class="copyblock-label">Short fallback &middot; <span class="charcount">74 characters</span></span>
+        <button class="copybtn" type="button" data-copy="one-short">Copy</button>
+      </div>
+      <div class="copyblock-body">
+        <p class="lede" id="one-short">Takes the order, then chases the invoice to paid by SMS, Voice and M-Pesa.</p>
+      </div>
+    </div>
+    <p class="note">Use the fallback only if the form caps the field below 89 characters.</p>
+  </section>
+
+  <section class="band">
+    <div class="band-head"><span class="band-num">03</span><h2>Long description</h2></div>
+
+    <div class="copyblock">
+      <div class="copyblock-bar">
+        <span class="copyblock-label">What it does</span>
+        <button class="copybtn" type="button" data-copy="ld-what">Copy</button>
+      </div>
+      <div class="copyblock-body" id="ld-what">
+        <p>Order to Cash is an agent that runs the whole distance between a customer placing an order and the
+          money landing in your M-Pesa. It takes the order over USSD or SMS, confirms it and puts it on the
+          schedule, issues the invoice, watches the due date, and when payment is late it chases on its own.
+          First an SMS. Then a second SMS. Then an automated Voice call. When the money arrives it reconciles
+          the receipt and stops chasing, without anyone telling it to.</p>
+        <p>Over 60% of Kenyan SME invoices are paid more than 30 days late. The chasing is real work, and it is
+          work that owners do at night after production stops. This agent does it during the day, every day,
+          and it never forgets an invoice.</p>
+      </div>
+    </div>
+
+    <h3>The loop</h3>
+    <p class="note">Seven steps in order. Step 05 and step 06 are the escalation, and they are what makes this
+      an agent rather than a reminder list.</p>
+    <ol class="loop">
+      <li><b>Order in</b><span>A customer dials your USSD code or sends a text. Free-text orders like
+        &ldquo;need 10 window grilles 4 inch by friday&rdquo; are read by Claude and turned into structured
+        line items priced against your catalog.</span></li>
+      <li><b>Confirm and schedule</b><span>The buyer gets an SMS with the order number, the total and the due
+        date. The order lands in your dashboard.</span></li>
+      <li><b>Collect</b><span>An M-Pesa STK push goes to the buyer's phone straight away. They can also reply
+        PAY at any time to get the prompt again.</span></li>
+      <li><b>Watch</b><span>The agent tracks the due date on every unpaid invoice.</span></li>
+      <li class="escalation"><b>Chase</b><span>Overdue triggers reminder one. The gap you set passes, reminder
+        two. Still nothing, and it places a Voice call that speaks the reminder aloud.</span></li>
+      <li class="escalation"><b>Escalate</b><span>If it is still unpaid after the call, the agent SMSes you,
+        the owner, so a human can decide what happens next.</span></li>
+      <li><b>Reconcile</b><span>Safaricom confirms the payment, the invoice flips to paid, the buyer gets a
+        thank-you SMS with the receipt number, and all follow-up stops.</span></li>
+    </ol>
+    <p class="note">Every message in and out is logged, so the dashboard shows the full trail on one screen:
+      who ordered, what was sent, what was said on the call, what was paid.</p>
+
+    <div class="copyblock">
+      <div class="copyblock-bar">
+        <span class="copyblock-label">Who it is for</span>
+        <button class="copybtn" type="button" data-copy="ld-who">Copy</button>
+      </div>
+      <div class="copyblock-body" id="ld-who">
+        <p>Fabrication workshops, furniture makers, food processors, printers, and any Jua Kali or SME
+          manufacturer who takes repeat orders from customers and waits to be paid. Your customers do not need
+          a smartphone, an app, or an account. They need a phone that can dial and receive a text, which is the
+          phone they already have.</p>
+      </div>
+    </div>
+
+    <h3>What you need before you deploy</h3>
+    <ul class="plain">
+      <li>An Africa's Talking account with SMS, USSD and Voice enabled.</li>
+      <li>An M-Pesa Daraja account, either the sandbox for testing or your own paybill or till for production.</li>
+      <li>An Anthropic API key if you want free-text SMS orders parsed by Claude. Without one the agent falls
+        back to a keyword parser and USSD ordering still works fully.</li>
+      <li>A Postgres database. Declare it at deploy time and the agent creates its own tables on first run.</li>
+    </ul>
+    <p class="note">Every setting is an environment variable. Nothing requires touching code.</p>
+
+    <h3>What it does not do</h3>
+    <p class="note">It does not manage your production floor, your machines, or your stock. It does not replace
+      your accountant. It handles the order and the money around it, and it hands you the audit trail for
+      everything else. Saying this plainly in the listing sets the buyer's expectation before they deploy,
+      which is cheaper than a refund.</p>
+  </section>
+
+  <section class="band">
+    <div class="band-head"><span class="band-num">04</span><h2>Pricing plans</h2></div>
+    <p class="note">Africa's Talking and Safaricom bill the SMS, Voice and M-Pesa traffic on the customer's own
+      account. These plans cover the agent itself, not the messages it sends. Say that on the listing.</p>
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>Plan</th><th>Price</th><th>Included</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="plan-name">Starter</td>
+            <td class="price">KES 1,500 / mo</td>
+            <td>Up to 200 invoices per month. USSD and SMS ordering, SMS reminders, Voice escalation, M-Pesa
+              collection, owner dashboard.</td>
+          </tr>
+          <tr>
+            <td class="plan-name">Workshop</td>
+            <td class="price">KES 4,500 / mo</td>
+            <td>Up to 1,000 invoices per month. Everything in Starter, plus a configurable reminder cadence and
+              owner escalation alerts.</td>
+          </tr>
+          <tr>
+            <td class="plan-name">Factory</td>
+            <td class="price">KES 12,000 / mo</td>
+            <td>Unlimited invoices. Everything in Workshop, plus a custom Voice script, custom SMS sender ID,
+              and priority support.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">If the form only accepts one plan for the hackathon submission, publish <b>Starter</b> on
+      its own. It is the plan a stranger will pick to try the product, and it is the one the judges will click.</p>
+  </section>
+
+  <section class="band">
+    <div class="band-head"><span class="band-num">05</span><h2>Supporting metadata</h2></div>
+    <div class="cols">
+      <div>
+        <dt>Category</dt>
+        <dd>Primary: Manufacturing Finance. Secondary: Order Management. If neither is in the picker, use
+          Fintech, then Other.</dd>
+      </div>
+      <div>
+        <dt>Africa's Talking products</dt>
+        <dd>SMS for confirmations, reminders and inbound orders. USSD for the primary intake. Voice for the
+          payment escalation call.</dd>
+      </div>
+      <div>
+        <dt>Database need</dt>
+        <dd>One Postgres 14 or newer database. Around 50MB covers the first year at 200 invoices per month.
+          The agent runs its own migration on deploy.</dd>
+      </div>
+      <div>
+        <dt>Logo direction</dt>
+        <dd>A single dark square holding a plain circular arrow that closes back on itself, with a small filled
+          dot where it closes. The loop is the product and the dot is the payment landing. One colour, no
+          gradient, readable at 64px.</dd>
+      </div>
+    </div>
+
+    <h3>Environment variables to declare</h3>
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>Variable</th><th>Required</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="var">DATABASE_URL</td><td class="req yes">Yes</td><td>Postgres connection string</td></tr>
+          <tr><td class="var">PUBLIC_BASE_URL</td><td class="req yes">Yes</td><td>Instance host, used to build every callback URL</td></tr>
+          <tr><td class="var">AT_USERNAME</td><td class="req yes">Yes</td><td><code>sandbox</code> for testing</td></tr>
+          <tr><td class="var">AT_API_KEY</td><td class="req yes">Yes</td><td></td></tr>
+          <tr><td class="var">AT_SMS_SHORTCODE</td><td class="req no">No</td><td>Sender ID, falls back to the account default</td></tr>
+          <tr><td class="var">AT_VOICE_NUMBER</td><td class="req no">No</td><td>Needed for Voice escalation</td></tr>
+          <tr><td class="var">AT_USSD_SERVICE_CODE</td><td class="req no">No</td><td>Your assigned code, for reference</td></tr>
+          <tr><td class="var">AT_SEND_ATTEMPTS</td><td class="req no">No</td><td>Retries per SMS or call, defaults to 5</td></tr>
+          <tr><td class="var">AT_SEND_GAP_MS</td><td class="req no">No</td><td>Gap between retries in milliseconds, defaults to 3000</td></tr>
+          <tr><td class="var">MPESA_ENV</td><td class="req yes">Yes</td><td><code>sandbox</code> or <code>production</code></td></tr>
+          <tr><td class="var">MPESA_CONSUMER_KEY</td><td class="req yes">Yes</td><td></td></tr>
+          <tr><td class="var">MPESA_CONSUMER_SECRET</td><td class="req yes">Yes</td><td></td></tr>
+          <tr><td class="var">MPESA_SHORTCODE</td><td class="req yes">Yes</td><td>Defaults to the sandbox shortcode 174379</td></tr>
+          <tr><td class="var">MPESA_PASSKEY</td><td class="req yes">Yes</td><td></td></tr>
+          <tr><td class="var">ANTHROPIC_API_KEY</td><td class="req no">No</td><td>Without it, free-text SMS orders use a keyword parser</td></tr>
+          <tr><td class="var">ANTHROPIC_MODEL</td><td class="req no">No</td><td>Defaults to <code>claude-haiku-4-5-20251001</code></td></tr>
+          <tr><td class="var">BUSINESS_NAME</td><td class="req no">No</td><td>Appears in every message to your customers</td></tr>
+          <tr><td class="var">CURRENCY</td><td class="req no">No</td><td>Defaults to KES</td></tr>
+          <tr><td class="var">DEFAULT_PAYMENT_TERMS_DAYS</td><td class="req no">No</td><td>Defaults to 7</td></tr>
+          <tr><td class="var">REMINDER_GAP_MINUTES</td><td class="req no">No</td><td>Gap between escalation steps, defaults to 2</td></tr>
+          <tr><td class="var">OWNER_GAP_MINUTES</td><td class="req no">No</td><td>When the owner gets alerted, defaults to 6</td></tr>
+          <tr><td class="var">OWNER_PHONE</td><td class="req no">No</td><td>Where owner escalations are sent</td></tr>
+          <tr><td class="var">AGENT_TICK_CRON</td><td class="req no">No</td><td>Defaults to every minute</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">For production, raise <code>REMINDER_GAP_MINUTES</code> and <code>OWNER_GAP_MINUTES</code>
+      into hours or days. The low defaults exist so the whole loop plays inside a demo window.</p>
+  </section>
+
+  <footer>
+    Source of truth for this copy is MARKETPLACE.md in the repo.<br>
+    Still outstanding on the section 7 checklist: logo file, Docker image pushed to the AT registry,
+    Terms of Service and Privacy Policy accepted.
+  </footer>
+
+</div>
+
+<script>
+  document.querySelectorAll(".copybtn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var target = document.getElementById(btn.dataset.copy);
+      if (!target) return;
+      var text = target.innerText.trim();
+      var done = function (word) {
+        btn.textContent = word;
+        btn.dataset.done = "1";
+        setTimeout(function () { btn.textContent = "Copy"; btn.dataset.done = "0"; }, 2200);
+      };
+      // Clipboard access can be blocked in a sandboxed frame. Fall back to
+      // selecting the text so the reader can still press Ctrl+C.
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done("Copied"); }, function () { selectIt(target, done); });
+      } else {
+        selectIt(target, done);
+      }
+    });
+  });
+
+  function selectIt(target, done) {
+    var range = document.createRange();
+    range.selectNodeContents(target);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    done("Ctrl+C");
+  }
+</script>
