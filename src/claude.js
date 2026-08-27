@@ -2,6 +2,10 @@
 // This is the honest "interpret messy information" step of the agent.
 // Falls back to a keyword parser when no OPENROUTER_API_KEY is set, so the
 // pipeline works offline during early development.
+//
+// Filename is a holdover from before the LLM brain swap (see commit
+// a90f584); the model actually called here is DeepSeek V4 Flash via
+// OpenRouter (cfg.llm.model), not Claude. See AI_COMPONENTS.md.
 
 const cfg = require('./config');
 

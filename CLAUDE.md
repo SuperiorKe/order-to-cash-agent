@@ -19,7 +19,7 @@ The project boots successfully without any credentials (DATABASE_URL, AT_API_KEY
 This is an **event-triggered, state-machine agent** for SME manufacturers. The flow is:
 
 1. **Intake (routes/ussd.js, routes/sms.js):** Customer places order via USSD or free-text SMS.
-2. **Parse (claude.js):** Claude Haiku extracts structured order from messy SMS text (tool use).
+2. **Parse (claude.js):** DeepSeek V4 Flash (via OpenRouter) extracts structured order from messy SMS text (tool use). The file is still named `claude.js` from before the LLM brain swap (see `a90f584`); see `AI_COMPONENTS.md`.
 3. **Create invoice (orders.js, invoices.js):** Order → Invoice, send confirmation SMS.
 4. **Collections loop (agent.js, cron tick):** Every minute, check due invoices and escalate:
    - SMS reminder #1 (day 0)
