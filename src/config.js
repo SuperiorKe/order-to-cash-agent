@@ -41,9 +41,10 @@ module.exports = {
     passkey: process.env.MPESA_PASSKEY || '',
   },
 
-  claude: {
-    apiKey: process.env.ANTHROPIC_API_KEY || '',
-    model: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001',
+  llm: {
+    apiKey: process.env.OPENROUTER_API_KEY || '',
+    model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-v4-flash-0731',
+    baseUrl: 'https://openrouter.ai/api/v1',
   },
 
   cadence: {
