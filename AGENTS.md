@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to Codex when working with code in this repository.
 
 ## Quick Commands
 
@@ -19,7 +19,7 @@ The project boots successfully without any credentials (DATABASE_URL, AT_API_KEY
 This is an **event-triggered, state-machine agent** for SME manufacturers. The flow is:
 
 1. **Intake (routes/ussd.js, routes/sms.js):** Customer places order via USSD or free-text SMS.
-2. **Parse (Codex.js):** Codex Haiku extracts structured order from messy SMS text (tool use).
+2. **Parse (claude.js):** Claude Haiku extracts structured order from messy SMS text (tool use).
 3. **Create invoice (orders.js, invoices.js):** Order → Invoice, send confirmation SMS.
 4. **Collections loop (agent.js, cron tick):** Every minute, check due invoices and escalate:
    - SMS reminder #1 (day 0)
@@ -36,7 +36,7 @@ The codebase is split by concern for a one-day hackathon team of 4:
 
 | Module | Owns | Concern |
 |--------|------|---------|
-| `routes/ussd.js`, `routes/sms.js`, `Codex.js`, `orders.js` | Order intake | Menu-driven USSD + free-text SMS parsing |
+| `routes/ussd.js`, `routes/sms.js`, `claude.js`, `orders.js` | Order intake | Menu-driven USSD + free-text SMS parsing |
 | `agent.js`, `invoices.js`, `africastalking.js`, `routes/voice.js` | Collections brain | Cron tick, state machine, SMS + Voice escalation |
 | `mpesa.js`, `routes/mpesa.js` | Payments | STK push, Daraja OAuth, callback reconciliation |
 | `routes/dashboard.js`, `routes/api.js`, `server.js`, `Dockerfile` | Surface + deploy | Owner dashboard, JSON API, liveness, containerization |
@@ -51,9 +51,9 @@ The codebase is split by concern for a one-day hackathon team of 4:
 
 ### 2. SMS Order Intake
 - POST `/webhooks/sms/inbound` from Africa's Talking: `{ from, to, text, id }`
-- Send `text` to Codex Haiku via tool use to extract `{ items, requested_delivery, notes }`.
+- Send `text` to Claude Haiku via tool use to extract `{ items, requested_delivery, notes }`.
 - Match item names to `products` table → create order → create invoice → send SMS.
-- **Important:** Codex parse fails gracefully; on error, log and reply to customer "we didn't understand, please try again."
+- **Important:** Claude parse fails gracefully; on error, log and reply to customer "we didn't understand, please try again."
 
 ### 3. Collections Tick (cron, `agent.js`)
 - Every minute (configurable via `AGENT_TICK_CRON`): scan `invoices where status in ('issued', 'reminded')`.
