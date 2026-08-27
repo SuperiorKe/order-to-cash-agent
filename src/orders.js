@@ -84,17 +84,23 @@ async function needsPricingList() {
   return rows;
 }
 
-// Orders joined to customer, optionally filtered by fulfillment. 'fulfilled'
-// and 'unfulfilled' are the only two states this app ever sets on
-// orders.status (see markFulfilled below); anything else returns every order.
+// Orders joined to customer and (left) to their invoice, optionally filtered.
+// 'fulfilled'/'unfulfilled' read orders.status (see markFulfilled below).
+// 'payment_failed' reads the invoice's last recorded STK failure — this is
+// an independent lens, not a third fulfillment bucket, the same way
+// 'unattended' already overlaps 'unfulfilled' rather than excluding it.
+// Anything else (or omitted) returns every order.
 async function listAll({ status } = {}) {
   const clause = status === 'fulfilled' ? `and o.status = 'fulfilled'`
     : status === 'unfulfilled' ? `and o.status <> 'fulfilled'`
+    : status === 'payment_failed' ? `and i.last_stk_result is not null and i.status <> 'paid'`
     : '';
   const { rows } = await db.query(
-    `select o.id, o.items, o.total_amount, o.source, o.status, o.created_at, c.name, c.phone
+    `select o.id, o.items, o.total_amount, o.source, o.status, o.created_at, c.name, c.phone,
+            i.status as invoice_status, i.last_stk_result, i.last_stk_result_at
        from orders o
        join customers c on c.id = o.customer_id
+       left join invoices i on i.order_id = o.id
       where true ${clause}
       order by o.created_at desc limit 30`,
   );

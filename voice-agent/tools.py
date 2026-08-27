@@ -31,6 +31,21 @@ def _get_params(path: str, params: dict):
     return requests.get(f"{API_BASE_URL}{path}", headers=_HEADERS, params=params, timeout=_TIMEOUT)
 
 
+# Mirrors mpesa.js's STK_RESULT_REASONS, in plain words for Friday to speak
+# instead of the raw snake_case reason string.
+_STK_REASON_SPOKEN = {
+    "insufficient_balance": "insufficient balance",
+    "cancelled": "the customer cancelled it",
+    "timeout": "it timed out with no PIN entered",
+    "wrong_pin": "a wrong PIN was entered",
+    "failed": "it failed",
+}
+
+
+def _spoken_reason(reason: str) -> str:
+    return _STK_REASON_SPOKEN.get(reason, reason)
+
+
 @function_tool()
 async def list_overdue_invoices(context: RunContext) -> str:  # type: ignore
     """
@@ -114,9 +129,10 @@ async def list_orders(
 ) -> str:
     """
     List recent orders. Pass status="fulfilled" for orders already completed,
-    status="unfulfilled" for orders not yet done, or status="all" (the
-    default) for both. This is about whether the physical order is done, not
-    whether it has been paid.
+    status="unfulfilled" for orders not yet done, status="payment_failed" for
+    orders whose last M-Pesa prompt did not go through, or status="all" (the
+    default) for everything. Fulfillment and payment are independent, so
+    "payment_failed" can include both fulfilled and unfulfilled orders.
     """
     try:
         r = _get_params("/api/orders", {"status": status})
@@ -126,11 +142,14 @@ async def list_orders(
         if not rows:
             return f"No {status} orders right now." if status != "all" else "No orders yet."
         currency = data.get("currency", "KES")
-        lines = [
-            f"Order {o['id']} ({o['status']}) from {o.get('name') or o.get('phone')}: "
-            f"{currency} {o['total_amount']}"
-            for o in rows
-        ]
+
+        def describe(o):
+            line = f"Order {o['id']} ({o['stage']}) from {o.get('name') or o.get('phone')}: {currency} {o['total_amount']}"
+            if o["stage"] == "payment_failed" and o.get("last_stk_result"):
+                line += f", last attempt {_spoken_reason(o['last_stk_result'])}"
+            return line
+
+        lines = [describe(o) for o in rows]
         return "; ".join(lines)
     except Exception as e:
         logging.error(f"list_orders failed: {e}")
@@ -205,7 +224,10 @@ async def send_mpesa_prompt_for_order(
         data = r.json()
         if not data.get("ok"):
             return f"The M-Pesa prompt for order {order_id} did not go through."
-        return f"M-Pesa prompt sent for order {order_id} to {data.get('sentTo', 'the customer')}."
+        msg = f"M-Pesa prompt sent for order {order_id} to {data.get('sentTo', 'the customer')}."
+        if data.get("previousFailureReason"):
+            msg += f" Note: the previous attempt failed because {_spoken_reason(data['previousFailureReason'])}."
+        return msg
     except Exception as e:
         logging.error(f"send_mpesa_prompt_for_order failed for {order_id}: {e}")
         return f"That M-Pesa prompt did not go through for order {order_id}."
@@ -296,7 +318,8 @@ async def get_order_status(
 ) -> str:
     """
     Look up a single order by its number and report the customer, items,
-    total, and whether it has been fulfilled.
+    total, and its stage: fulfilled, needs pricing, awaiting payment, a
+    failed payment attempt (with the reason), or paid but not yet fulfilled.
     """
     try:
         r = _get(f"/api/orders/{order_id}")
@@ -306,10 +329,17 @@ async def get_order_status(
         data = r.json()
         o = data["order"]
         currency = data.get("currency", "KES")
+        stage = o["stage"]
+        stage_text = {
+            "fulfilled": "fulfilled",
+            "needs_pricing": "still waiting on pricing",
+            "awaiting_payment": "not yet fulfilled, awaiting payment",
+            "paid_awaiting_fulfillment": "paid, not yet fulfilled",
+            "payment_failed": f"not yet fulfilled, last M-Pesa prompt failed because {_spoken_reason(o.get('last_stk_result') or 'failed')}",
+        }.get(stage, stage)
         return (
             f"Order {o['id']} for {o.get('name') or o.get('phone')}: "
-            f"{currency} {o['total_amount']} total, source {o['source']}, "
-            f"{'fulfilled' if o['status'] == 'fulfilled' else 'not yet fulfilled'}."
+            f"{currency} {o['total_amount']} total, source {o['source']}, {stage_text}."
         )
     except Exception as e:
         logging.error(f"get_order_status failed for {order_id}: {e}")
@@ -320,7 +350,8 @@ async def get_order_status(
 async def get_business_summary(context: RunContext) -> str:  # type: ignore
     """
     Give a quick spoken summary of the business: how many invoices are
-    still open, how many are overdue, and how much is outstanding.
+    still open, how many are overdue, how much is outstanding, and how many
+    recent M-Pesa prompts failed to go through.
     """
     try:
         r = _get("/api/summary")
@@ -331,7 +362,8 @@ async def get_business_summary(context: RunContext) -> str:  # type: ignore
             f"{d['open_invoices']} invoice(s) still open, "
             f"{d['overdue_invoices']} overdue, "
             f"{currency} {d['outstanding_amount']} outstanding, "
-            f"{currency} {d['paid_last_7_days']} paid in the last seven days."
+            f"{currency} {d['paid_last_7_days']} paid in the last seven days, "
+            f"{d.get('failed_payment_attempts', 0)} with a failed M-Pesa attempt."
         )
     except Exception as e:
         logging.error(f"get_business_summary failed: {e}")
