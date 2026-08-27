@@ -102,11 +102,11 @@ npm start
 `GET /` is a live view of invoices and the message trail. Every SMS, call, and
 M-Pesa event shows up there as it happens.
 
-<!-- TODO: screenshot. Run `npm run seed:demo` then `npm start`, open
-     http://localhost:3000, and drop the image here as docs/dashboard.png.
-     Not generated in this pass: AT_API_KEY and OPENROUTER_API_KEY are both
-     live in .env, so starting the server for real fires an actual SMS (and,
-     left running, a real voice call) rather than a dry-run stand-in. -->
+![Dashboard: invoices table and live message trail](docs/dashboard.png)
+
+Phone numbers in this screenshot are redacted (down to the country code) since
+this is a live demo database with real test numbers in it. The dashboard
+itself shows the full number.
 
 ## Endpoints
 
