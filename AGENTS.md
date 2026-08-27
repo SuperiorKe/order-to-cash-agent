@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Quick Commands
 
@@ -19,7 +19,7 @@ The project boots successfully without any credentials (DATABASE_URL, AT_API_KEY
 This is an **event-triggered, state-machine agent** for SME manufacturers. The flow is:
 
 1. **Intake (routes/ussd.js, routes/sms.js):** Customer places order via USSD or free-text SMS.
-2. **Parse (claude.js):** Claude Haiku extracts structured order from messy SMS text (tool use).
+2. **Parse (Codex.js):** Codex Haiku extracts structured order from messy SMS text (tool use).
 3. **Create invoice (orders.js, invoices.js):** Order → Invoice, send confirmation SMS.
 4. **Collections loop (agent.js, cron tick):** Every minute, check due invoices and escalate:
    - SMS reminder #1 (day 0)
@@ -36,7 +36,7 @@ The codebase is split by concern for a one-day hackathon team of 4:
 
 | Module | Owns | Concern |
 |--------|------|---------|
-| `routes/ussd.js`, `routes/sms.js`, `claude.js`, `orders.js` | Order intake | Menu-driven USSD + free-text SMS parsing |
+| `routes/ussd.js`, `routes/sms.js`, `Codex.js`, `orders.js` | Order intake | Menu-driven USSD + free-text SMS parsing |
 | `agent.js`, `invoices.js`, `africastalking.js`, `routes/voice.js` | Collections brain | Cron tick, state machine, SMS + Voice escalation |
 | `mpesa.js`, `routes/mpesa.js` | Payments | STK push, Daraja OAuth, callback reconciliation |
 | `routes/dashboard.js`, `routes/api.js`, `server.js`, `Dockerfile` | Surface + deploy | Owner dashboard, JSON API, liveness, containerization |
@@ -51,9 +51,9 @@ The codebase is split by concern for a one-day hackathon team of 4:
 
 ### 2. SMS Order Intake
 - POST `/webhooks/sms/inbound` from Africa's Talking: `{ from, to, text, id }`
-- Send `text` to Claude Haiku via tool use to extract `{ items, requested_delivery, notes }`.
+- Send `text` to Codex Haiku via tool use to extract `{ items, requested_delivery, notes }`.
 - Match item names to `products` table → create order → create invoice → send SMS.
-- **Important:** Claude parse fails gracefully; on error, log and reply to customer "we didn't understand, please try again."
+- **Important:** Codex parse fails gracefully; on error, log and reply to customer "we didn't understand, please try again."
 
 ### 3. Collections Tick (cron, `agent.js`)
 - Every minute (configurable via `AGENT_TICK_CRON`): scan `invoices where status in ('issued', 'reminded')`.
@@ -80,11 +80,9 @@ The codebase is split by concern for a one-day hackathon team of 4:
 ### 7. Owner Voice Assistant (`voice-agent/`, Friday)
 - A separate Python process (LiveKit Agents SDK), outside the Node server and its module ownership split.
 - STT/LLM/TTS all run through Groq (`agent.py`, `groq_tts.py`); the LLM is `gpt-oss-120b` at low reasoning effort, kept fast enough for voice.
-- Tools (`tools.py`) call `routes/api.js` over HTTP — `list_overdue_invoices`, `list_unpaid_invoices`, `list_unattended_orders`, `list_orders`, `get_invoice_status`, `get_order_status`, `get_order_summary`, `mark_order_fulfilled`, `send_payment_reminder`, `send_mpesa_prompt`, `send_mpesa_prompt_for_order`, `get_business_summary`. It never queries Postgres directly.
+- Tools (`tools.py`) call `routes/api.js` over HTTP — `list_overdue_invoices`, `list_unpaid_invoices`, `list_unattended_orders`, `get_invoice_status`, `get_order_status`, `send_payment_reminder`, `send_mpesa_prompt`, `get_business_summary`. It never queries Postgres directly.
 - Talks only to the owner ("Boss"), never to a customer; the customer-facing Voice escalation is `routes/voice.js` (Section 4 above), a different system with a different, firmer tone.
-- "Unattended orders" (`orders.needsPricingList()`) means an item never matched the product catalog, priced at KES 0, and needs the owner to price it by hand.
-- `orders.status` starts at `'received'` and is otherwise untouched by the rest of the codebase (USSD/SMS intake, the collections tick) — the only path that ever changes it is Friday's `mark_order_fulfilled` tool, flipping it to `'fulfilled'`. That is a separate axis from invoice payment status: an order can be fulfilled and still unpaid, or paid and not yet fulfilled.
-- `send_mpesa_prompt_for_order` and `send_mpesa_prompt` do the same STK push, just addressed by order id vs invoice id — order numbers and invoice numbers are different sequences, since one order maps to exactly one invoice created at the same time.
+- "Unattended orders" (`orders.needsPricingList()`) means an item never matched the product catalog, priced at KES 0, and needs the owner to price it by hand — `orders.status` itself is never updated anywhere in this codebase, so it can't distinguish handled from not.
 - `send_payment_reminder` sends a real SMS, and `send_mpesa_prompt` puts a real STK push on the customer's phone for the invoice's exact amount, both through the same `africastalking.js` / `mpesa.js` paths the rest of the app uses. Set `VOICE_AGENT_API_KEY` in both `.env` files once `PUBLIC_BASE_URL` is a public tunnel, or the `/api/*` routes are reachable by anyone with the URL.
 - Run it with the Node server already up (`npm start`), then `python agent.py` from `voice-agent/` with its own venv and `.env`. See `voice-agent/README.md`.
 

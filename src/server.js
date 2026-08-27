@@ -20,6 +20,7 @@ app.use('/ussd', require('./routes/ussd'));
 app.use('/webhooks/sms', require('./routes/sms'));
 app.use('/webhooks/voice', require('./routes/voice'));
 app.use('/webhooks/mpesa', require('./routes/mpesa'));
+app.use('/', require('./routes/api'));       // JSON surface for voice-agent/ (Friday)
 app.use('/', require('./routes/dashboard'));
 
 app.listen(cfg.port, () => {

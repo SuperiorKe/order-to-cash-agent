@@ -38,13 +38,26 @@ npm start
 | POST | `/webhooks/sms/inbound` | Africa's Talking (inbound SMS) |
 | POST | `/webhooks/voice` | Africa's Talking (Voice) |
 | POST | `/webhooks/mpesa/callback` | Safaricom (STK result) |
+| GET  | `/api/summary`, `/api/invoices/overdue`, `/api/invoices/unpaid`, `/api/invoices/:id`, `/api/orders/unattended`, `/api/orders/:id` | `voice-agent/` (Friday) |
+| POST | `/api/invoices/:id/remind`, `/api/invoices/:id/stkpush` | `voice-agent/` (Friday) |
 
 Point the Africa's Talking and Daraja callbacks at `PUBLIC_BASE_URL` + the path.
 In development, expose your machine with a tunnel and set `PUBLIC_BASE_URL` to it.
+
+Set `VOICE_AGENT_API_KEY` to require an `x-api-key` header on the `/api/*`
+routes — worth doing once `PUBLIC_BASE_URL` is a public tunnel, since two of
+those routes reach a real customer (an SMS, and an M-Pesa payment prompt).
+
+## Owner voice assistant
+
+`voice-agent/` is Friday, a LiveKit voice agent the owner talks to directly:
+overdue invoices, order lookups, on-demand reminders. It never talks to
+customers and never touches Postgres directly, it calls the `/api/*` routes
+above. See `voice-agent/README.md` to run it.
 
 ## Who owns what (one-day split)
 
 - **A — Intake:** `routes/ussd.js`, `routes/sms.js`, `claude.js`, `orders.js`
 - **B — Collections:** `agent.js`, `invoices.js`, `africastalking.js`, `routes/voice.js`
 - **C — Payments:** `mpesa.js`, `routes/mpesa.js`
-- **D — Surface + ship:** `routes/dashboard.js`, `Dockerfile`, Marketplace metadata
+- **D — Surface + ship:** `routes/dashboard.js`, `routes/api.js`, `Dockerfile`, Marketplace metadata, `voice-agent/`

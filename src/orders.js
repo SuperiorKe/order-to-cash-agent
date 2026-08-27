@@ -50,4 +50,90 @@ async function createOrder({ phone, name, items, source, rawText }) {
   return { customer, order, invoice, needsPricing };
 }
 
-module.exports = { upsertCustomer, priceItems, createOrder };
+// One order, joined to the customer. Used by the JSON API (routes/api.js)
+// for the owner's voice assistant.
+async function getById(id) {
+  const { rows } = await db.query(
+    `select o.*, c.name, c.phone
+       from orders o
+       join customers c on c.id = o.customer_id
+      where o.id = $1`,
+    [id],
+  );
+  return rows[0];
+}
+
+// Orders nobody has priced yet: total_amount <= 0, or one of the items
+// never matched the catalog (same condition createOrder() computes as
+// needsPricing, recomputed here since it is not persisted on the row).
+// This is the closest thing this schema has to "the owner hasn't dealt
+// with this yet" — order.status itself is set once at creation and never
+// changes anywhere in the codebase, so it can't tell attended from not.
+async function needsPricingList() {
+  const { rows } = await db.query(
+    `select o.id, o.items, o.total_amount, o.source, o.created_at, c.name, c.phone
+       from orders o
+       join customers c on c.id = o.customer_id
+      where o.total_amount <= 0
+         or exists (
+              select 1 from jsonb_array_elements(o.items) it
+              where (it->>'sku') is null or coalesce((it->>'unit_price')::numeric, 0) = 0
+            )
+      order by o.created_at desc`,
+  );
+  return rows;
+}
+
+// Orders joined to customer, optionally filtered by fulfillment. 'fulfilled'
+// and 'unfulfilled' are the only two states this app ever sets on
+// orders.status (see markFulfilled below); anything else returns every order.
+async function listAll({ status } = {}) {
+  const clause = status === 'fulfilled' ? `and o.status = 'fulfilled'`
+    : status === 'unfulfilled' ? `and o.status <> 'fulfilled'`
+    : '';
+  const { rows } = await db.query(
+    `select o.id, o.items, o.total_amount, o.source, o.status, o.created_at, c.name, c.phone
+       from orders o
+       join customers c on c.id = o.customer_id
+      where true ${clause}
+      order by o.created_at desc limit 30`,
+  );
+  return rows;
+}
+
+// Flip an order to fulfilled. Only ever set by the owner (via Friday, the
+// voice assistant) saying the physical order is done — never inferred from
+// payment, which is a separate axis. Returns undefined if the order does not
+// exist or was already fulfilled, so the caller can tell those apart.
+async function markFulfilled(id) {
+  const { rows } = await db.query(
+    `update orders set status='fulfilled' where id=$1 and status <> 'fulfilled' returning *`,
+    [id],
+  );
+  return rows[0];
+}
+
+// Counts for "what kinds of orders do I have": fulfilled vs not, and how many
+// of the unfulfilled ones are also stuck waiting on pricing (see
+// needsPricingList for what that condition means).
+async function summary() {
+  const { rows } = await db.query(
+    `select
+       count(*) as total,
+       count(*) filter (where status = 'fulfilled') as fulfilled,
+       count(*) filter (where status <> 'fulfilled') as unfulfilled,
+       count(*) filter (where status <> 'fulfilled' and (
+         total_amount <= 0 or exists (
+           select 1 from jsonb_array_elements(items) it
+           where (it->>'sku') is null or coalesce((it->>'unit_price')::numeric, 0) = 0
+         )
+       )) as unfulfilled_needs_pricing
+     from orders`,
+  );
+  return rows[0];
+}
+
+module.exports = {
+  upsertCustomer, priceItems, createOrder, getById, needsPricingList,
+  listAll, markFulfilled, summary,
+};
