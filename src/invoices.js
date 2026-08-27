@@ -42,12 +42,63 @@ async function setCheckoutRequestId(id, checkoutRequestId) {
 }
 
 // Reconcile an M-Pesa success. Idempotent: only flips an unpaid invoice.
+// Clears any recorded push failure — a later success makes it stale.
 async function markPaid(checkoutRequestId, receipt) {
   const { rows } = await db.query(
-    `update invoices set status='paid', mpesa_receipt=$2, paid_at=now()
+    `update invoices set status='paid', mpesa_receipt=$2, paid_at=now(),
+            last_stk_result=null, last_stk_result_at=null
       where checkout_request_id=$1 and status <> 'paid'
       returning *`,
     [checkoutRequestId, receipt],
+  );
+  return rows[0];
+}
+
+// Record why the last STK push didn't complete. Deliberately does not touch
+// `status` — that column drives agent.js's reminder ladder by exact string
+// match, so the invoice stays in its normal reminder cycle regardless of
+// this. Guarded by status <> 'paid' so a late/duplicate failure callback
+// can't overwrite an invoice a later success already settled. Joins to
+// orders/customers for the phone: a failure callback carries no
+// CallbackMetadata, unlike a success one.
+async function markStkFailed(checkoutRequestId, reason) {
+  const { rows } = await db.query(
+    `update invoices i set last_stk_result=$2, last_stk_result_at=now()
+       from orders o, customers c
+      where i.checkout_request_id = $1 and i.status <> 'paid'
+        and o.id = i.order_id and c.id = o.customer_id
+      returning i.*, c.name, c.phone`,
+    [checkoutRequestId, reason],
+  );
+  return rows[0];
+}
+
+// Same as markPaid, keyed by invoice id instead of checkout_request_id.
+// Preferred reconciliation path: an invoice can receive more than one STK
+// push (auto push at order creation, a customer REPLY-PAY, an owner retry
+// through Friday), and setCheckoutRequestId overwrites the column on every
+// push, so a callback for an earlier push would otherwise match no row.
+// Same idempotency guard as markPaid.
+async function markPaidByInvoiceId(id, receipt) {
+  const { rows } = await db.query(
+    `update invoices set status='paid', mpesa_receipt=$2, paid_at=now(),
+            last_stk_result=null, last_stk_result_at=null
+      where id=$1 and status <> 'paid'
+      returning *`,
+    [id, receipt],
+  );
+  return rows[0];
+}
+
+// Same as markStkFailed, keyed by invoice id instead of checkout_request_id.
+async function markStkFailedByInvoiceId(id, reason) {
+  const { rows } = await db.query(
+    `update invoices i set last_stk_result=$2, last_stk_result_at=now()
+       from orders o, customers c
+      where i.id = $1 and i.status <> 'paid'
+        and o.id = i.order_id and c.id = o.customer_id
+      returning i.*, c.name, c.phone`,
+    [id, reason],
   );
   return rows[0];
 }
@@ -128,6 +179,7 @@ async function overdueList() {
 
 module.exports = {
   issueInvoice, dueForFollowUp, markReminded, markVoiceEscalated,
-  markOwnerEscalated, setCheckoutRequestId, markPaid, latestUnpaidByPhone,
-  getById, getByOrderId, overdueList, unpaidList,
+  markOwnerEscalated, setCheckoutRequestId, markPaid, markStkFailed,
+  markPaidByInvoiceId, markStkFailedByInvoiceId,
+  latestUnpaidByPhone, getById, getByOrderId, overdueList, unpaidList,
 };

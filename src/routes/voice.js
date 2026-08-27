@@ -6,6 +6,11 @@ const router = express.Router();
 const cfg = require('../config');
 
 router.post('/', (req, res) => {
+  // Africa's Talking does not cryptographically sign its callbacks. Unlike
+  // ussd.js/sms.js there is no service-code/shortcode field on this request
+  // to check it against, and this route always speaks the same static line
+  // regardless of who calls it. Production hardening needs IP allowlisting
+  // at the network edge.
   res.set('Content-Type', 'application/xml');
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>

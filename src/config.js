@@ -21,6 +21,9 @@ module.exports = {
   currency: process.env.CURRENCY || 'KES',
   databaseUrl: process.env.DATABASE_URL || '',
   atEnvironment: atEnv,
+  // Shared secret for the M-Pesa callback URL (the money path). Empty by
+  // default, which keeps dry-run and the current behaviour unchanged.
+  webhookSecret: process.env.WEBHOOK_SECRET || '',
 
   at: {
     username: atUsername || '',

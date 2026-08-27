@@ -14,8 +14,17 @@ const db = require('../db');
 router.post('/', async (req, res) => {
   const { text = '', phoneNumber, sessionId, serviceCode } = req.body;
   console.log(`[ussd] incoming request - phone: ${phoneNumber}, sessionId: ${sessionId}, serviceCode: ${serviceCode}, text: "${text}"`);
-  const steps = text.split('*').filter((s) => s !== '');
   res.set('Content-Type', 'text/plain');
+
+  // Africa's Talking does not cryptographically sign its callbacks, so this
+  // only checks the request names the service code we were actually
+  // provisioned with — a plausibility check, not authentication. Production
+  // hardening needs IP allowlisting at the network edge on top of this.
+  if (cfg.at.ussdServiceCode && serviceCode !== cfg.at.ussdServiceCode) {
+    return res.send('END Service unavailable.');
+  }
+
+  const steps = text.split('*').filter((s) => s !== '');
 
   try {
     if (steps.length === 0) {
