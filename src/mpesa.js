@@ -48,6 +48,12 @@ async function stkPush({ invoice, phone }) {
 
   const t = timestamp();
   const password = b64(`${cfg.mpesa.shortcode}${cfg.mpesa.passkey}${t}`);
+  // When WEBHOOK_SECRET is set, ask Daraja to echo it straight back on the
+  // callback query string, so routes/mpesa.js can verify it before trusting
+  // anything in the body.
+  const callbackUrl = cfg.webhookSecret
+    ? `${cfg.publicBaseUrl}/webhooks/mpesa/callback?secret=${encodeURIComponent(cfg.webhookSecret)}`
+    : `${cfg.publicBaseUrl}/webhooks/mpesa/callback`;
   const body = {
     BusinessShortCode: Number(cfg.mpesa.shortcode),
     Password: password,
@@ -57,7 +63,7 @@ async function stkPush({ invoice, phone }) {
     PartyA: Number(msisdn),
     PartyB: Number(cfg.mpesa.shortcode),
     PhoneNumber: Number(msisdn),
-    CallBackURL: `${cfg.publicBaseUrl}/webhooks/mpesa/callback`,
+    CallBackURL: callbackUrl,
     AccountReference: `INV-${invoice.id}`,
     TransactionDesc: `Invoice INV-${invoice.id}`,
   };
@@ -77,4 +83,28 @@ async function stkPush({ invoice, phone }) {
   return data;
 }
 
-module.exports = { getToken, stkPush, normalizeMsisdn };
+// Safaricom's documented STK ResultCodes for the common non-success cases.
+// Anything not listed here (rare/undocumented codes) falls back to 'failed';
+// the raw ResultCode and ResultDesc are still recorded in the messages log
+// by the callback handler, so nothing is actually lost.
+const STK_RESULT_REASONS = {
+  1: 'insufficient_balance',
+  1032: 'cancelled',
+  1037: 'timeout',
+  2001: 'wrong_pin',
+};
+function describeResultCode(code) {
+  return STK_RESULT_REASONS[code] || 'failed';
+}
+
+// Recovers the invoice id from the AccountReference we sent above
+// ("INV-<id>"), which Safaricom echoes back in the callback's
+// CallbackMetadata on both success and failure. Lets routes/mpesa.js
+// reconcile against the invoice itself instead of checkout_request_id, which
+// setCheckoutRequestId overwrites on every repeat push.
+function parseInvoiceIdFromAccountRef(accountRef) {
+  const m = /^INV-(\d+)$/.exec(String(accountRef || '').trim());
+  return m ? Number(m[1]) : null;
+}
+
+module.exports = { getToken, stkPush, normalizeMsisdn, describeResultCode, parseInvoiceIdFromAccountRef };

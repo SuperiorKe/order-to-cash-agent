@@ -23,10 +23,34 @@ const at = require('../africastalking');
 const mpesa = require('../mpesa');
 
 router.use('/api', (req, res, next) => {
+  // /api/live (routes/dashboard.js) is read-only internal dashboard polling,
+  // not a customer-reaching or action route, and the dashboard's own fetch
+  // never sends x-api-key — exempt it so setting the key doesn't lock the
+  // owner's own dashboard out of its 3-second refresh.
+  if (req.method === 'GET' && req.path === '/live') return next();
+
   const required = process.env.VOICE_AGENT_API_KEY;
   if (!required || req.get('x-api-key') === required) return next();
   res.status(401).json({ error: 'missing or invalid x-api-key' });
 });
+
+// Same condition orders.needsPricingList() computes in SQL, applied in JS to
+// a row that's already been fetched — avoids a second query just to answer
+// "does this one order still need pricing."
+function needsPricing(o) {
+  return Number(o.total_amount) <= 0 || (o.items || []).some((it) => !it.sku || !it.unit_price);
+}
+
+// One human-readable label synthesized from independent, already-persisted
+// facts (order fulfillment, invoice status, last STK result) rather than a
+// stored field of its own — so it can never drift out of sync with them.
+function deriveStage(o) {
+  if (o.status === 'fulfilled') return 'fulfilled';
+  if (needsPricing(o)) return 'needs_pricing';
+  if (o.invoice_status === 'paid') return 'paid_awaiting_fulfillment';
+  if (o.last_stk_result) return 'payment_failed';
+  return 'awaiting_payment';
+}
 
 router.get('/api/invoices/overdue', async (req, res) => {
   if (!(await db.healthy())) return res.status(503).json({ error: 'database not connected' });
@@ -124,12 +148,13 @@ router.get('/api/orders/unattended', async (req, res) => {
   }
 });
 
-// ?status=fulfilled|unfulfilled filters; anything else (or omitted) lists all.
+// ?status=fulfilled|unfulfilled|payment_failed filters; anything else (or
+// omitted) lists all.
 router.get('/api/orders', async (req, res) => {
   if (!(await db.healthy())) return res.status(503).json({ error: 'database not connected' });
   try {
     const rows = await orders.listAll({ status: req.query.status });
-    res.json({ currency: cfg.currency, orders: rows });
+    res.json({ currency: cfg.currency, orders: rows.map((o) => ({ ...o, stage: deriveStage(o) })) });
   } catch (e) {
     console.error('[api] list orders failed', e.message);
     res.status(500).json({ error: 'could not load orders' });
@@ -181,12 +206,18 @@ router.post('/api/orders/:id/stkpush', async (req, res) => {
     if (inv.status === 'paid') return res.status(409).json({ error: 'invoice already paid' });
     if (Number(inv.amount) <= 0) return res.status(409).json({ error: 'invoice has no priced amount yet' });
 
+    // Captured before the push overwrites checkout_request_id, so this is
+    // "what happened last time" — exactly what Friday should mention when
+    // Boss asks to retry an order that already failed once.
+    const previousFailureReason = inv.last_stk_result || null;
+
     const r = await mpesa.stkPush({ invoice: inv, phone: inv.phone });
     if (r.CheckoutRequestID) await invoices.setCheckoutRequestId(inv.id, r.CheckoutRequestID);
 
     res.json({
       ok: r.ResponseCode === '0' || r.ResponseCode === 'dry-run',
       orderId: order.id, invoiceId: inv.id, sentTo: inv.phone, responseCode: r.ResponseCode,
+      previousFailureReason,
     });
   } catch (e) {
     console.error('[api] manual order stk push failed', e.message);
@@ -199,7 +230,17 @@ router.get('/api/orders/:id', async (req, res) => {
   try {
     const order = await orders.getById(req.params.id);
     if (!order) return res.status(404).json({ error: `order ${req.params.id} not found` });
-    res.json({ currency: cfg.currency, order });
+
+    const inv = await invoices.getByOrderId(order.id);
+    const merged = {
+      ...order,
+      invoice_status: inv?.status || null,
+      last_stk_result: inv?.last_stk_result || null,
+      last_stk_result_at: inv?.last_stk_result_at || null,
+    };
+    merged.stage = deriveStage(merged);
+
+    res.json({ currency: cfg.currency, order: merged });
   } catch (e) {
     console.error('[api] get order failed', e.message);
     res.status(500).json({ error: 'could not load order' });
@@ -214,7 +255,8 @@ router.get('/api/summary', async (req, res) => {
          count(*) filter (where status <> 'paid')                                                       as open_invoices,
          count(*) filter (where status in ('issued','reminded','voice_escalated') and due_date < now())  as overdue_invoices,
          coalesce(sum(amount) filter (where status <> 'paid'), 0)                                        as outstanding_amount,
-         coalesce(sum(amount) filter (where status = 'paid' and paid_at > now() - interval '7 days'), 0) as paid_last_7_days
+         coalesce(sum(amount) filter (where status = 'paid' and paid_at > now() - interval '7 days'), 0) as paid_last_7_days,
+         count(*) filter (where last_stk_result is not null and status <> 'paid')                        as failed_payment_attempts
        from invoices`,
     );
     res.json({ currency: cfg.currency, ...rows[0] });

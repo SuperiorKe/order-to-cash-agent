@@ -3,6 +3,7 @@
 
 const express = require('express');
 const router = express.Router();
+const cfg = require('../config');
 const claude = require('../claude');
 const orders = require('../orders');
 const invoices = require('../invoices');
@@ -13,6 +14,15 @@ const db = require('../db');
 router.post('/inbound', async (req, res) => {
   const from = req.body.from;
   const text = (req.body.text || '').trim();
+
+  // Africa's Talking does not cryptographically sign its callbacks, so this
+  // only checks the request was addressed to our shortcode — a plausibility
+  // check, not authentication. Production hardening needs IP allowlisting at
+  // the network edge on top of this.
+  if (cfg.at.smsShortcode && req.body.to !== cfg.at.smsShortcode) {
+    return res.status(200).json({ status: 'ignored' });
+  }
+
   res.status(200).json({ status: 'ok' }); // acknowledge AT immediately
 
   try {
