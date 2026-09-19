@@ -3,6 +3,7 @@
 
 const cfg = require('./config');
 const db = require('./db');
+const { fmtMoney } = require('./money');
 
 let token = { value: null, expiresAt: 0 };
 
@@ -42,7 +43,7 @@ async function stkPush({ invoice, phone }) {
 
   if (!cfg.mpesa.passkey || !cfg.mpesa.consumerKey) {
     console.log(`[mpesa:DRY] STK push skipped (no credentials) for INV-${invoice.id}`);
-    await db.recordMessage({ direction: 'out', channel: 'mpesa', phone: msisdn, body: `STK push (dry-run) ${cfg.currency} ${invoice.amount}`, providerId: `DRY-${invoice.id}`, invoiceId: invoice.id });
+    await db.recordMessage({ direction: 'out', channel: 'mpesa', phone: msisdn, body: `STK push (dry-run) ${cfg.currency} ${fmtMoney(invoice.amount)}`, providerId: `DRY-${invoice.id}`, invoiceId: invoice.id });
     return { CheckoutRequestID: `DRY-${invoice.id}`, ResponseCode: 'dry-run' };
   }
 

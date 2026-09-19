@@ -12,6 +12,22 @@ async function upsertCustomer(phone, name) {
   return rows[0];
 }
 
+// One definition of "this line still needs a price", shared by the JS that
+// computes needsPricing at intake, the SQL lists below, and routes/api.js.
+// An unmatched item is stored with unit_price 0 (see priceItems), and a
+// custom item the owner prices by hand keeps sku null, so the price is the
+// only honest signal — a sku check would keep hand-priced lines in the
+// needs-pricing list forever.
+function isUnpriced(item) {
+  return !(Number(item?.unit_price) > 0);
+}
+const UNPRICED_ITEM_SQL = `exists (
+  select 1 from jsonb_array_elements(%ITEMS%) it
+  where coalesce((it->>'unit_price')::numeric, 0) <= 0
+)`;
+const unpricedSql = (itemsCol, totalCol) =>
+  `(${totalCol} <= 0 or ${UNPRICED_ITEM_SQL.replace('%ITEMS%', itemsCol)})`;
+
 // Match each requested item to the catalog by name. Unknown items price at 0
 // so the owner can correct them, rather than blocking the order.
 async function priceItems(items) {
@@ -43,10 +59,14 @@ async function createOrder({ phone, name, items, source, rawText }) {
     [customer.id, JSON.stringify(priced), total, source, rawText || null],
   );
   const order = rows[0];
-  const invoice = await invoices.issueInvoice(order, total);
   // An item we could not match to the catalog prices at 0. Never ask a customer
   // to pay an amount we have not actually worked out; hand it to the owner.
-  const needsPricing = total <= 0 || priced.some((i) => !i.sku || !i.unit_price);
+  // The invoice is held at 0 until every line has a price — otherwise a
+  // partly matched order ("3 custom gates and 2 steel doors") would be
+  // invoiced, and then chased by the collections tick, for the doors alone.
+  // pricing.js sets the real amount once the owner fills in the gap.
+  const needsPricing = total <= 0 || priced.some(isUnpriced);
+  const invoice = await invoices.issueInvoice(order, needsPricing ? 0 : total);
   return { customer, order, invoice, needsPricing };
 }
 
@@ -71,14 +91,13 @@ async function getById(id) {
 // changes anywhere in the codebase, so it can't tell attended from not.
 async function needsPricingList() {
   const { rows } = await db.query(
-    `select o.id, o.items, o.total_amount, o.source, o.created_at, c.name, c.phone
+    `select o.id, o.items, o.total_amount, o.source, o.raw_text, o.created_at, c.name, c.phone,
+            i.id as invoice_id, i.status as invoice_status
        from orders o
        join customers c on c.id = o.customer_id
-      where o.total_amount <= 0
-         or exists (
-              select 1 from jsonb_array_elements(o.items) it
-              where (it->>'sku') is null or coalesce((it->>'unit_price')::numeric, 0) = 0
-            )
+       left join invoices i on i.order_id = o.id
+      where ${unpricedSql('o.items', 'o.total_amount')}
+        and coalesce(i.status, '') <> 'paid'
       order by o.created_at desc`,
   );
   return rows;
@@ -128,18 +147,39 @@ async function summary() {
        count(*) as total,
        count(*) filter (where status = 'fulfilled') as fulfilled,
        count(*) filter (where status <> 'fulfilled') as unfulfilled,
-       count(*) filter (where status <> 'fulfilled' and (
-         total_amount <= 0 or exists (
-           select 1 from jsonb_array_elements(items) it
-           where (it->>'sku') is null or coalesce((it->>'unit_price')::numeric, 0) = 0
-         )
-       )) as unfulfilled_needs_pricing
+       count(*) filter (where status <> 'fulfilled' and ${unpricedSql('items', 'total_amount')})
+         as unfulfilled_needs_pricing
      from orders`,
+  );
+  return rows[0];
+}
+
+// Persist owner-set prices onto an order's item lines and recompute the
+// total. `prices` is keyed by line index: { unit_price, line_total }. The
+// owner names what a line costs, so line_total is the truth and unit_price
+// is derived (rounded to 2dp) — 3 gates for 10,000 must invoice 10,000, not
+// 9,999.99. Lines priced this way carry `priced_by: "owner"` so the audit
+// trail can tell a hand price from a catalog match; sku stays null for
+// custom items. Pure persistence — validation and the customer-facing
+// follow-up live in pricing.js.
+async function applyPrices(orderId, prices) {
+  const order = await getById(orderId);
+  if (!order) return undefined;
+  const items = (order.items || []).map((it, idx) => (
+    prices[idx] === undefined ? it
+      : { ...it, unit_price: prices[idx].unit_price, line_total: prices[idx].line_total, priced_by: 'owner' }
+  ));
+  const total = items.reduce((s, i) => s + (
+    i.line_total !== undefined ? Number(i.line_total) : Number(i.qty) * Number(i.unit_price)
+  ), 0);
+  const { rows } = await db.query(
+    `update orders set items=$2, total_amount=$3 where id=$1 returning *`,
+    [orderId, JSON.stringify(items), total],
   );
   return rows[0];
 }
 
 module.exports = {
   upsertCustomer, priceItems, createOrder, getById, needsPricingList,
-  listAll, markFulfilled, summary,
+  listAll, markFulfilled, summary, isUnpriced, unpricedSql, applyPrices,
 };

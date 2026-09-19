@@ -10,6 +10,7 @@ const mpesa = require('../mpesa');
 const invoices = require('../invoices');
 const notify = require('../notify');
 const db = require('../db');
+const { fmtMoney } = require('../money');
 
 router.post('/', async (req, res) => {
   const { text = '', phoneNumber, sessionId, serviceCode } = req.body;
@@ -41,7 +42,7 @@ router.post('/', async (req, res) => {
         [phoneNumber],
       );
       if (!rows.length) return res.send('END You have no orders yet.');
-      const list = rows.map((r) => `INV-${r.id} ${cfg.currency}${r.amount} ${r.status}`).join('\n');
+      const list = rows.map((r) => `INV-${r.id} ${Number(r.amount) > 0 ? cfg.currency + ' ' + fmtMoney(r.amount) : 'awaiting price'} ${r.status}`).join('\n');
       return res.send(`END Your recent orders:\n${list}`);
     }
 
@@ -70,7 +71,7 @@ router.post('/', async (req, res) => {
         if (needsPricing) {
           return res.send(`END Order INV-${invoice.id} received. We are confirming the price and will SMS your invoice shortly.`);
         }
-        return res.send(`END Order INV-${invoice.id} received, ${cfg.currency} ${invoice.amount}. Check your phone for an M-Pesa prompt.`);
+        return res.send(`END Order INV-${invoice.id} received, ${cfg.currency} ${fmtMoney(invoice.amount)}. Check your phone for an M-Pesa prompt.`);
       }
     }
 

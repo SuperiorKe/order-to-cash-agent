@@ -23,8 +23,14 @@ app.use('/webhooks/mpesa', require('./routes/mpesa'));
 app.use('/', require('./routes/api'));       // JSON surface for voice-agent/ (Friday)
 app.use('/', require('./routes/dashboard'));
 
-app.listen(cfg.port, () => {
-  console.log(`[server] ${cfg.businessName} order-to-cash agent listening on :${cfg.port}`);
-  console.log(`[server] public base: ${cfg.publicBaseUrl}`);
-  startAgent();
-});
+// Exported for tests, which mount the app on a random port and drive it with
+// fetch. Only the real entrypoint listens and starts the collections tick.
+module.exports = app;
+
+if (require.main === module) {
+  app.listen(cfg.port, () => {
+    console.log(`[server] ${cfg.businessName} order-to-cash agent listening on :${cfg.port}`);
+    console.log(`[server] public base: ${cfg.publicBaseUrl}`);
+    startAgent();
+  });
+}

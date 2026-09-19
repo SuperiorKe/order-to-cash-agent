@@ -6,6 +6,7 @@ const cfg = require('./config');
 const invoices = require('./invoices');
 const at = require('./africastalking');
 const db = require('./db');
+const { fmtMoney } = require('./money');
 
 const MIN = 60 * 1000;
 
@@ -34,13 +35,13 @@ async function tick() {
       if (inv.status !== 'voice_escalated' && inv.reminders_sent === 0) {
         await at.sendSMS({
           to: inv.phone, invoiceId: inv.id,
-          message: `Hello${inv.name ? ' ' + inv.name : ''}. Invoice INV-${inv.id} of ${cfg.currency} ${inv.amount} is due. Reply PAY for an M-Pesa prompt. — ${cfg.businessName}`,
+          message: `Hello${inv.name ? ' ' + inv.name : ''}. Invoice INV-${inv.id} of ${cfg.currency} ${fmtMoney(inv.amount)} is due. Reply PAY for an M-Pesa prompt. — ${cfg.businessName}`,
         });
         await invoices.markReminded(inv.id, 1, 'reminded');
       } else if (inv.status === 'reminded' && inv.reminders_sent === 1 && overdueBy >= gap) {
         await at.sendSMS({
           to: inv.phone, invoiceId: inv.id,
-          message: `Reminder 2: INV-${inv.id} (${cfg.currency} ${inv.amount}) is still unpaid. Please settle today. — ${cfg.businessName}`,
+          message: `Reminder 2: INV-${inv.id} (${cfg.currency} ${fmtMoney(inv.amount)}) is still unpaid. Please settle today. — ${cfg.businessName}`,
         });
         await invoices.markReminded(inv.id, 2, 'reminded');
       } else if (inv.status === 'reminded' && inv.reminders_sent >= 2 && overdueBy >= 2 * gap) {
@@ -49,7 +50,7 @@ async function tick() {
       } else if (inv.status === 'voice_escalated' && overdueBy >= ownerGap && cfg.cadence.ownerPhone) {
         await at.sendSMS({
           to: cfg.cadence.ownerPhone, invoiceId: inv.id,
-          message: `INV-${inv.id} (${cfg.currency} ${inv.amount}) from ${inv.name || inv.phone} is still unpaid after escalation.`,
+          message: `INV-${inv.id} (${cfg.currency} ${fmtMoney(inv.amount)}) from ${inv.name || inv.phone} is still unpaid after escalation.`,
         });
         await invoices.markOwnerEscalated(inv.id);
       }

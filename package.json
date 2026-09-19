@@ -1,14 +1,16 @@
 {
   "name": "order-to-cash-agent",
   "version": "0.1.0",
-  "description": "Order-to-Cash agent for SME manufacturers — Africa's Talking Manufacturing Hackathon, Nairobi 2026",
+  "description": "Order-to-Cash agent for SME manufacturers \u2014 Africa's Talking Manufacturing Hackathon, Nairobi 2026",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "migrate": "node scripts/migrate.js",
     "seed:demo": "node scripts/seed-demo.js",
-    "test:sms": "node scripts/test-sms.js"
+    "test:sms": "node scripts/test-sms.js",
+    "test": "node --test test/",
+    "db:local": "node scripts/dev-db.js"
   },
   "engines": {
     "node": ">=20"
@@ -20,5 +22,8 @@
     "express": "^4.21.2",
     "node-cron": "^3.0.3",
     "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "embedded-postgres": "^17.10.0-beta.17"
   }
 }

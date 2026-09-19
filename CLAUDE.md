@@ -9,7 +9,9 @@ npm start              # Run server on :3000 (dry-run if no credentials)
 npm run dev            # Run with --watch for hot reload
 npm run migrate        # Create Postgres tables + seed product catalog
 npm run seed:demo      # Create one overdue invoice for live demo testing
-npm test:sms           # Test SMS parsing by sending a raw SMS to /webhooks/sms/inbound
+npm run test:sms       # Test SMS parsing by sending a raw SMS to /webhooks/sms/inbound
+npm test               # node:test suite against a throwaway embedded Postgres (no Docker needed)
+npm run db:local       # Local Postgres in ./.pgdata via embedded-postgres, migration applied
 ```
 
 The project boots successfully without any credentials (DATABASE_URL, AT_API_KEY, etc.) and runs in dry-run mode — SMS, Voice, and M-Pesa calls are logged to console instead of sent.
@@ -20,7 +22,8 @@ This is an **event-triggered, state-machine agent** for SME manufacturers. The f
 
 1. **Intake (routes/ussd.js, routes/sms.js):** Customer places order via USSD or free-text SMS.
 2. **Parse (claude.js):** DeepSeek V4 Flash (via OpenRouter) extracts structured order from messy SMS text (tool use). The file is still named `claude.js` from before the LLM brain swap (see `a90f584`); see `AI_COMPONENTS.md`.
-3. **Create invoice (orders.js, invoices.js):** Order → Invoice, send confirmation SMS.
+3. **Create invoice (orders.js, invoices.js):** Order → Invoice, send confirmation SMS. If any line did not match the catalog the invoice is held at KES 0 and the owner is alerted instead.
+3b. **Owner pricing (pricing.js):** The owner prices the unpriced lines — by SMS reply `PRICE <invoice> <amount>`, from the dashboard's "Needs pricing" panel, via `POST /api/{invoices,orders}/:id/price`, or through Friday's `price_order` tool. The invoice gets its real amount, payment terms restart, and the customer receives the same confirmation SMS + M-Pesa prompt they would have got at intake.
 4. **Collections loop (agent.js, cron tick):** Every minute, check due invoices and escalate:
    - SMS reminder #1 (day 0)
    - SMS reminder #2 (day 0 + gap)
@@ -36,7 +39,7 @@ The codebase is split by concern for a one-day hackathon team of 4:
 
 | Module | Owns | Concern |
 |--------|------|---------|
-| `routes/ussd.js`, `routes/sms.js`, `claude.js`, `orders.js` | Order intake | Menu-driven USSD + free-text SMS parsing |
+| `routes/ussd.js`, `routes/sms.js`, `claude.js`, `orders.js`, `pricing.js` | Order intake | Menu-driven USSD + free-text SMS parsing; owner pricing of unmatched items |
 | `agent.js`, `invoices.js`, `africastalking.js`, `routes/voice.js` | Collections brain | Cron tick, state machine, SMS + Voice escalation |
 | `mpesa.js`, `routes/mpesa.js` | Payments | STK push, Daraja OAuth, callback reconciliation |
 | `routes/dashboard.js`, `routes/api.js`, `server.js`, `Dockerfile` | Surface + deploy | Owner dashboard, JSON API, liveness, containerization |
@@ -54,6 +57,15 @@ The codebase is split by concern for a one-day hackathon team of 4:
 - Send `text` to Claude Haiku via tool use to extract `{ items, requested_delivery, notes }`.
 - Match item names to `products` table → create order → create invoice → send SMS.
 - **Important:** Claude parse fails gracefully; on error, log and reply to customer "we didn't understand, please try again."
+
+### 2b. Owner Pricing (`pricing.js`)
+- Trigger: an order arrived with a line the catalog could not match. `orders.createOrder()` stores that line at `unit_price: 0`, issues the invoice at **KES 0** (never a partial total — the tick would otherwise chase the customer for the matched lines alone), tells the customer "we are confirming the price", and SMSes `OWNER_PHONE` "INV-n needs pricing".
+- Owner replies `PRICE <invoice> <amount> [amount …]` from `OWNER_PHONE` (compared after `mpesa.normalizeMsisdn()`, so `07…`, `2547…`, `+2547…` all match). Amounts are **line totals**, one per unpriced line in order; for a single-line order that is the invoice total. Commas inside a number are thousands separators; amounts are separated by spaces. `PRICE` from any other number gets a short "this keyword is for the owner" reply and creates no order.
+- Same operation over JSON: `POST /api/invoices/:id/price` or `POST /api/orders/:id/price` with `{ "amounts": [..] }` or `{ "amount": n }`. Errors: 404 not found, 409 `already_paid` / `nothing_to_price`, 400 `bad_amounts` / `count_mismatch` (the latter returns `expected`, `got`, and the unpriced `lines`). Behind `VOICE_AGENT_API_KEY` like `/remind` and `/stkpush`, because it reaches a real customer.
+- Effects, in order: `orders.applyPrices()` sets `unit_price` (line total ÷ qty, 2dp), `line_total`, and `priced_by: "owner"` on each priced line and recomputes `total_amount` from line totals; `invoices.reprice()` sets `amount`, resets `due_date` to now + `DEFAULT_PAYMENT_TERMS_DAYS`, stamps `priced_at`; a `messages` row (`direction='in'`, channel `sms` or `api`) records who priced what; then `notify.announceOrder()` + `mpesa.stkPush()` exactly as at intake. A failed customer send never undoes the price.
+- Only unpriced lines can be priced; repricing a priced, unpaid invoice is refused. "Unpriced" is defined once in `orders.isUnpriced()` / `orders.unpricedSql()` as `unit_price <= 0` — not "no sku", since hand-priced custom items keep `sku: null`.
+- Dashboard: the "Needs pricing" panel polls with everything else but never re-renders a row already on screen, so a half-typed amount survives the 3-second refresh. When `VOICE_AGENT_API_KEY` is set the form gets a 401 and says so; use the SMS command or Friday.
+- Human-facing amounts go through `money.fmtMoney()` ("KES 45,000", not "KES 45000.00"). The M-Pesa `Amount` field stays an integer in `mpesa.js`.
 
 ### 3. Collections Tick (cron, `agent.js`)
 - Every minute (configurable via `AGENT_TICK_CRON`): scan `invoices where status in ('issued', 'reminded')`.
@@ -81,7 +93,8 @@ The codebase is split by concern for a one-day hackathon team of 4:
 - A separate Python process (LiveKit Agents SDK), outside the Node server and its module ownership split.
 - STT/LLM/TTS all run through Groq (`agent.py`, `groq_tts.py`); the LLM is `gpt-oss-120b` at low reasoning effort, kept fast enough for voice.
 - Boss can speak English, Swahili, or switch mid-conversation — Whisper STT runs with `detect_language=True` (no `language` pin) so it transcribes whichever language it hears instead of forcing English decoding. The LLM understands both and is instructed (`prompts.py`) to always reply out loud in English regardless. Groq's hosted TTS (Orpheus) only speaks English and Arabic, no Swahili voice — a genuinely Swahili-speaking Friday would need a second TTS provider (e.g. ElevenLabs multilingual), deliberately not added.
-- Tools (`tools.py`) call `routes/api.js` over HTTP — `list_overdue_invoices`, `list_unpaid_invoices`, `list_unattended_orders`, `list_orders`, `get_invoice_status`, `get_order_status`, `get_order_summary`, `mark_order_fulfilled`, `send_payment_reminder`, `send_mpesa_prompt`, `send_mpesa_prompt_for_order`, `get_business_summary`. It never queries Postgres directly.
+- Tools (`tools.py`) call `routes/api.js` over HTTP — `list_overdue_invoices`, `list_unpaid_invoices`, `list_unattended_orders`, `list_orders`, `get_invoice_status`, `get_order_status`, `get_order_summary`, `mark_order_fulfilled`, `price_order`, `send_payment_reminder`, `send_mpesa_prompt`, `send_mpesa_prompt_for_order`, `get_business_summary`. It never queries Postgres directly.
+- `price_order(order_id, amounts)` closes the "unattended" loop from voice: amounts are line totals for the unpriced lines, and the tool relays a `count_mismatch` back in words so Friday asks Boss for the missing figures instead of guessing.
 - `list_orders` also accepts `status=payment_failed` (orders whose last STK push didn't complete), and every order response carries a derived `stage` (`fulfilled`, `needs_pricing`, `awaiting_payment`, `payment_failed`, or `paid_awaiting_fulfillment`) computed in `routes/api.js`'s `deriveStage()`, not stored anywhere — it's synthesized from `orders.status`, invoice `status`, and `last_stk_result` so it can't drift out of sync with them. `get_business_summary` also reports `failed_payment_attempts`.
 - Talks only to the owner ("Boss"), never to a customer; the customer-facing Voice escalation is `routes/voice.js` (Section 4 above), a different system with a different, firmer tone.
 - "Unattended orders" (`orders.needsPricingList()`) means an item never matched the product catalog, priced at KES 0, and needs the owner to price it by hand.
@@ -145,6 +158,8 @@ The codebase is split by concern for a one-day hackathon team of 4:
 
 ## Testing & Demo
 
+- **Automated tests:** `npm test` runs `test/*.test.js` with `node:test`. `test/helpers/testdb.js` boots a throwaway embedded Postgres on a free port, applies `db/migration.sql`, `chdir`s to a temp dir so a local `.env` cannot leak credentials, and forces dry-run. Tests drive the real Express app over HTTP and assert on the `messages` audit table. Note `bigint` ids come back from node-postgres as strings.
+- **Local DB without Docker:** `npm run db:local` (embedded Postgres in `./.pgdata`, gitignored) then put the printed `DATABASE_URL` in `.env`.
 - **Manual SMS test:** `npm run test:sms` sends a raw SMS via the webhook (requires `.env` and DB).
 - **Live demo seeding:** `npm run seed:demo` creates one customer + one invoice already past due. Next cron tick fires reminder #1 live on stage.
 - **Risk mitigation:** See BUILD_PLAN.md Section 9 for risks (inbound SMS not provisioned, callback URL not reachable, Voice latency, STK cancellation) and their mitigations.

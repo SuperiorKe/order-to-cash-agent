@@ -21,6 +21,8 @@ const invoices = require('../invoices');
 const orders = require('../orders');
 const at = require('../africastalking');
 const mpesa = require('../mpesa');
+const pricing = require('../pricing');
+const { fmtMoney } = require('../money');
 
 router.use('/api', (req, res, next) => {
   // /api/live (routes/dashboard.js) is read-only internal dashboard polling,
@@ -38,7 +40,34 @@ router.use('/api', (req, res, next) => {
 // a row that's already been fetched — avoids a second query just to answer
 // "does this one order still need pricing."
 function needsPricing(o) {
-  return Number(o.total_amount) <= 0 || (o.items || []).some((it) => !it.sku || !it.unit_price);
+  return Number(o.total_amount) <= 0 || (o.items || []).some(orders.isUnpriced);
+}
+
+// Shared by both /price routes. Body: { amounts: [lineTotal, ...] } — one per
+// unpriced line, in order — or { amount: n } as sugar for a single line.
+function amountsFromBody(body) {
+  if (Array.isArray(body?.amounts)) return body.amounts;
+  if (body?.amount !== undefined) return [body.amount];
+  return [];
+}
+
+async function priceAndRespond(res, target, body) {
+  try {
+    const r = await pricing.priceInvoice({ ...target, amounts: amountsFromBody(body), by: 'api' });
+    res.json({
+      ok: true, currency: cfg.currency,
+      invoiceId: r.invoice.id, orderId: r.order.id, total: r.total, dueDate: r.invoice.due_date,
+      lines: r.lines, sentTo: r.invoice.phone,
+      customerNotified: r.followUp.announced, stkResponseCode: r.followUp.stk,
+    });
+  } catch (e) {
+    if (e instanceof pricing.PricingError) {
+      const { expected, got, lines } = e;
+      return res.status(pricing.HTTP_STATUS[e.code] || 400).json({ error: e.message, code: e.code, expected, got, lines });
+    }
+    console.error('[api] price failed', e.message);
+    res.status(500).json({ error: 'could not price the order' });
+  }
 }
 
 // One human-readable label synthesized from independent, already-persisted
@@ -100,7 +129,7 @@ router.post('/api/invoices/:id/remind', async (req, res) => {
     await at.sendSMS({
       to: inv.phone,
       invoiceId: inv.id,
-      message: `Hello${inv.name ? ' ' + inv.name : ''}. Reminder: INV-${inv.id} of ${cfg.currency} ${inv.amount} is due. Reply PAY for an M-Pesa prompt. — ${cfg.businessName}`,
+      message: `Hello${inv.name ? ' ' + inv.name : ''}. Reminder: INV-${inv.id} of ${cfg.currency} ${fmtMoney(inv.amount)} is due. Reply PAY for an M-Pesa prompt. — ${cfg.businessName}`,
     });
     await invoices.markReminded(inv.id, inv.reminders_sent + 1, inv.status === 'issued' ? 'reminded' : inv.status);
 
@@ -133,6 +162,27 @@ router.post('/api/invoices/:id/stkpush', async (req, res) => {
     console.error('[api] manual stk push failed', e.message);
     res.status(500).json({ error: 'STK push failed to send' });
   }
+});
+
+// The owner names the price for an order that arrived with an item the
+// catalog could not match. Updates the order lines and the invoice, restarts
+// payment terms, and sends the customer the same confirmation SMS + M-Pesa
+// prompt they would have got at intake. See pricing.js. This reaches a real
+// customer, so it sits behind VOICE_AGENT_API_KEY like /remind and /stkpush.
+router.post('/api/invoices/:id/price', async (req, res) => {
+  if (!(await db.healthy())) return res.status(503).json({ error: 'database not connected' });
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(404).json({ error: `invoice ${req.params.id} not found` });
+  await priceAndRespond(res, { invoiceId: id }, req.body);
+});
+
+// Order-scoped version, for when Boss names an order instead of an invoice.
+router.post('/api/orders/:id/price', async (req, res) => {
+  if (!(await db.healthy())) return res.status(503).json({ error: 'database not connected' });
+  const id = Number(req.params.id);
+  const order = Number.isInteger(id) ? await orders.getById(id).catch(() => undefined) : undefined;
+  if (!order) return res.status(404).json({ error: `order ${req.params.id} not found` });
+  await priceAndRespond(res, { orderId: order.id }, req.body);
 });
 
 // Orders nobody has priced yet — the closest thing this schema has to

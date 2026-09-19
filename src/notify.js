@@ -3,6 +3,7 @@
 
 const cfg = require('./config');
 const at = require('./africastalking');
+const { fmtMoney } = require('./money');
 
 // Returns true when the order is priced and it is fair to ask for payment.
 async function announceOrder({ phone, order, invoice, needsPricing, summary }) {
@@ -23,7 +24,7 @@ async function announceOrder({ phone, order, invoice, needsPricing, summary }) {
   const due = new Date(invoice.due_date).toDateString();
   await at.sendSMS({
     to: phone, orderId: order.id, invoiceId: invoice.id,
-    message: `Order INV-${invoice.id} confirmed${summary ? ': ' + summary : ''}. Total ${cfg.currency} ${invoice.amount}, due ${due}. Reply PAY for an M-Pesa prompt. \u2014 ${cfg.businessName}`,
+    message: `Order INV-${invoice.id} confirmed${summary ? ': ' + summary : ''}. Total ${cfg.currency} ${fmtMoney(invoice.amount)}, due ${due}. Reply PAY for an M-Pesa prompt. \u2014 ${cfg.businessName}`,
   });
   return true;
 }

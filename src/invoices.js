@@ -37,6 +37,20 @@ async function markOwnerEscalated(id) {
   await db.query("update invoices set status='owner_escalated' where id=$1", [id]);
 }
 
+// The owner has priced an order that arrived with unmatched items. Sets the
+// real amount, restarts payment terms from now (the customer is only now
+// seeing a figure), and stamps priced_at. Guarded by status <> 'paid' so a
+// price can never land on a settled invoice; returns undefined in that case.
+async function reprice(id, amount, dueDate) {
+  const { rows } = await db.query(
+    `update invoices set amount=$2, due_date=$3, priced_at=now()
+      where id=$1 and status <> 'paid'
+      returning *`,
+    [id, amount, dueDate.toISOString()],
+  );
+  return rows[0];
+}
+
 async function setCheckoutRequestId(id, checkoutRequestId) {
   await db.query('update invoices set checkout_request_id=$2 where id=$1', [id, checkoutRequestId]);
 }
@@ -179,7 +193,7 @@ async function overdueList() {
 
 module.exports = {
   issueInvoice, dueForFollowUp, markReminded, markVoiceEscalated,
-  markOwnerEscalated, setCheckoutRequestId, markPaid, markStkFailed,
+  markOwnerEscalated, reprice, setCheckoutRequestId, markPaid, markStkFailed,
   markPaidByInvoiceId, markStkFailedByInvoiceId,
   latestUnpaidByPhone, getById, getByOrderId, overdueList, unpaidList,
 };

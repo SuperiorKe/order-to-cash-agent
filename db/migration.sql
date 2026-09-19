@@ -49,6 +49,12 @@ create table if not exists invoices (
 alter table invoices add column if not exists last_stk_result text;
 alter table invoices add column if not exists last_stk_result_at timestamptz;
 
+-- When the owner priced an order that arrived with an item the catalog could
+-- not match (see src/pricing.js). Null for orders priced automatically at
+-- intake. due_date is reset at the same moment: payment terms run from when
+-- the customer first sees a real amount, not from when they placed the order.
+alter table invoices add column if not exists priced_at timestamptz;
+
 create table if not exists messages (
   id           bigserial primary key,
   direction    text not null,

@@ -97,10 +97,34 @@ npm run seed:demo           # optional: one overdue invoice for the live demo
 npm start
 ```
 
+No Postgres (or Docker) on the machine? `npm run db:local` starts an embedded
+Postgres in `./.pgdata` on :5432, applies the migration, and prints the
+`DATABASE_URL` to paste into `.env`. Data persists between runs.
+
+## Tests
+
+```bash
+npm test                    # node:test, against a throwaway embedded Postgres
+```
+
+The suite boots its own Postgres on a free port, runs the real Express app in
+dry-run mode, and asserts on the `messages` audit table — the same rows the
+dashboard shows. No credentials, no Docker, nothing is sent.
+
 ## Dashboard
 
 `GET /` is a live view of invoices and the message trail. Every SMS, call, and
 M-Pesa event shows up there as it happens.
+
+When an order arrives with an item the catalog cannot match, it is held at
+KES 0 and appears in a **Needs pricing** panel at the top. Type what each
+unpriced line costs and press *Price & invoice*: the customer gets their
+invoice by SMS and an M-Pesa prompt for the full amount, and the collections
+loop takes over from there. The owner can do the same from their phone by
+replying to the "needs pricing" alert with `PRICE <invoice> <amount>`, or
+by asking Friday.
+
+![Dashboard: needs-pricing panel above the invoices table](docs/dashboard-needs-pricing.png)
 
 ![Dashboard: invoices table and live message trail](docs/dashboard.png)
 
@@ -118,15 +142,18 @@ itself shows the full number.
 | POST | `/webhooks/sms/inbound` | Africa's Talking (inbound SMS) |
 | POST | `/webhooks/voice` | Africa's Talking (Voice) |
 | POST | `/webhooks/mpesa/callback` | Safaricom (STK result) |
-| GET  | `/api/summary`, `/api/invoices/overdue`, `/api/invoices/unpaid`, `/api/invoices/:id`, `/api/orders/unattended`, `/api/orders/:id` | `voice-agent/` (Friday) |
-| POST | `/api/invoices/:id/remind`, `/api/invoices/:id/stkpush` | `voice-agent/` (Friday) |
+| GET  | `/api/summary`, `/api/invoices/overdue`, `/api/invoices/unpaid`, `/api/invoices/:id`, `/api/orders`, `/api/orders/summary`, `/api/orders/unattended`, `/api/orders/:id` | `voice-agent/` (Friday) |
+| POST | `/api/invoices/:id/remind`, `/api/invoices/:id/stkpush`, `/api/orders/:id/stkpush`, `/api/orders/:id/fulfill` | `voice-agent/` (Friday) |
+| POST | `/api/invoices/:id/price`, `/api/orders/:id/price` — body `{ "amounts": [lineTotal, …] }` or `{ "amount": n }` | Dashboard, `voice-agent/` (Friday) |
 
 Point the Africa's Talking and Daraja callbacks at `PUBLIC_BASE_URL` + the path.
 In development, expose your machine with a tunnel and set `PUBLIC_BASE_URL` to it.
 
 Set `VOICE_AGENT_API_KEY` to require an `x-api-key` header on the `/api/*`
-routes — worth doing once `PUBLIC_BASE_URL` is a public tunnel, since two of
-those routes reach a real customer (an SMS, and an M-Pesa payment prompt).
+routes — worth doing once `PUBLIC_BASE_URL` is a public tunnel, since several
+of those routes reach a real customer (an SMS, an M-Pesa payment prompt, and
+pricing, which sends both). With the key set, the dashboard's pricing form is
+locked out too; price by SMS or through Friday instead.
 
 ## Owner voice assistant
 

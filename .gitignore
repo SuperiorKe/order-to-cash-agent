@@ -8,3 +8,6 @@ voice-agent/__pycache__/
 voice-agent/*.pyc
 voice-agent/venv/
 voice-agent/.venv/
+
+# local embedded Postgres data (npm run db:local)
+.pgdata/

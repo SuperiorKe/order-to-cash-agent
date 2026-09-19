@@ -201,6 +201,52 @@ async def mark_order_fulfilled(
         return f"Could not mark order {order_id} fulfilled right now."
 
 
+def _post_json(path: str, payload: dict):
+    return requests.post(f"{API_BASE_URL}{path}", headers=_HEADERS, json=payload, timeout=_TIMEOUT)
+
+
+@function_tool()
+async def price_order(
+    context: RunContext,  # type: ignore
+    order_id: int,
+    amounts: list[float],
+) -> str:
+    """
+    Set the price for an order that is waiting on pricing because an item
+    never matched the catalog. `amounts` is what each unpriced line costs in
+    total (not per unit), one number per unpriced line in the order they
+    appear — for a single-line order that is just the invoice total. The
+    customer is then sent their invoice by SMS and an M-Pesa prompt for the
+    full amount, so only call this once Boss has clearly stated the figure.
+    Refused if the invoice is already paid or already priced.
+    """
+    try:
+        r = _post_json(f"/api/orders/{order_id}/price", {"amounts": amounts})
+        if r.status_code == 404:
+            return f"There is no order {order_id}."
+        if r.status_code in (400, 409):
+            data = r.json()
+            if data.get("code") == "count_mismatch":
+                lines = ", ".join(data.get("lines", []))
+                return (
+                    f"Order {order_id} has {data.get('expected')} unpriced lines ({lines}) "
+                    f"but I was given {data.get('got')} amount(s). I need one amount per line."
+                )
+            return f"Cannot price order {order_id}: {data.get('error', 'not eligible')}."
+        r.raise_for_status()
+        data = r.json()
+        currency = data.get("currency", "KES")
+        msg = f"Order {order_id} priced at {currency} {data['total']} total, invoice INV-{data['invoiceId']}."
+        if data.get("customerNotified"):
+            msg += f" The customer at {data.get('sentTo', 'their number')} has the invoice and an M-Pesa prompt."
+        else:
+            msg += " The customer notification did not go out; the reminder cycle will reach them."
+        return msg
+    except Exception as e:
+        logging.error(f"price_order failed for {order_id}: {e}")
+        return f"Could not price order {order_id} right now."
+
+
 @function_tool()
 async def send_mpesa_prompt_for_order(
     context: RunContext,  # type: ignore
