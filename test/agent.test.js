@@ -103,10 +103,18 @@ test('second reminder does not fire before reminderGapMin elapses', async () => 
 
 test('voice escalation fires once overdueBy clears 2x reminderGapMin', async () => {
   const { reminderGapMin } = cfg.cadence;
-  const { invoice } = await seedInvoice({ status: 'reminded', remindersSent: 2, dueMinutesAgo: 2 * reminderGapMin + 1 });
+  const { invoice } = await seedInvoice({ status: 'reminded', remindersSent: 2, dueMinutesAgo: 2 * reminderGapMin - 0.5 });
+
   await agent.tick();
-  const inv = await invoiceRow(invoice.id);
-  const msgs = await messagesFor(invoice.id);
+  let inv = await invoiceRow(invoice.id);
+  let msgs = await messagesFor(invoice.id);
+  assert.equal(inv.status, 'reminded', 'not yet at the 2x-gap threshold');
+  assert.equal(msgs.length, 0);
+
+  await pool.query(`update invoices set due_date = now() - ($2 * interval '1 minute') where id=$1`, [invoice.id, 2 * reminderGapMin + 1]);
+  await agent.tick();
+  inv = await invoiceRow(invoice.id);
+  msgs = await messagesFor(invoice.id);
   assert.equal(inv.status, 'voice_escalated');
   assert.equal(inv.reminders_sent, 2, 'untouched by the voice step');
   assert.equal(msgs.length, 1);
